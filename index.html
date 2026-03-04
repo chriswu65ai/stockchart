@@ -14,7 +14,7 @@
   <body>
     <main class="layout">
       <header>
-        <h1>Share Price Timeline</h1>
+        <h1>Focus Charts Viewer</h1>
       </header>
 
       <section class="controls" aria-label="Upload and chart controls">
@@ -39,9 +39,25 @@
         </div>
 
         <div class="control-item">
+          <label for="series-a-type">Series A style</label>
+          <select id="series-a-type" disabled>
+            <option value="line">Line</option>
+            <option value="bar">Bar</option>
+          </select>
+        </div>
+
+        <div class="control-item">
           <label for="series-b-select">Series B (right axis)</label>
           <select id="series-b-select" disabled>
             <option value="">None</option>
+          </select>
+        </div>
+
+        <div class="control-item">
+          <label for="series-b-type">Series B style</label>
+          <select id="series-b-type" disabled>
+            <option value="line">Line</option>
+            <option value="bar">Bar</option>
           </select>
         </div>
         <div class="control-item checkbox-item">
@@ -72,8 +88,8 @@
           <canvas id="share-chart" aria-label="Interactive share price chart"></canvas>
         </div>
 
-        <label class="scroll-label" for="timeline-window">Timeline window</label>
-        <div id="timeline-window" class="timeline-window" role="slider" aria-label="Timeline window control">
+        <label class="scroll-label" for="timeline-window">Timeframe</label>
+        <div id="timeline-window" class="timeline-window" role="slider" aria-label="Timeframe control">
           <div id="timeline-selection" class="timeline-selection">
             <span id="timeline-handle-left" class="timeline-handle" aria-hidden="true"></span>
             <span id="timeline-handle-right" class="timeline-handle" aria-hidden="true"></span>

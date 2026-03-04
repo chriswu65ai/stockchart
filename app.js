@@ -2,6 +2,8 @@ const fileInput = document.getElementById('excel-file');
 const sheetSelect = document.getElementById('sheet-select');
 const seriesASelect = document.getElementById('series-a-select');
 const seriesBSelect = document.getElementById('series-b-select');
+const seriesATypeSelect = document.getElementById('series-a-type');
+const seriesBTypeSelect = document.getElementById('series-b-type');
 const resetZoomButton = document.getElementById('reset-zoom');
 const showEventToggle = document.getElementById('show-event-annotations');
 const showCommentToggle = document.getElementById('show-comment-annotations');
@@ -31,6 +33,8 @@ const EVENT_KEYS = ['event', 'title', 'milestone'];
 const COMMENT_KEYS = ['comment', 'comments', 'note', 'notes'];
 const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
 const MIN_WINDOW_PCT = 2;
+const SERIES_A_COLOR = '#023047';
+const SERIES_B_COLOR = '#FFB703';
 
 const extractHttpUrl = (text) => {
   const match = String(text ?? '').match(URL_PATTERN);
@@ -133,6 +137,37 @@ const wrapByPixelWidth = (text, chartInstance, maxWidthPx) => {
   return lines;
 };
 
+const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) => {
+  const common = {
+    label,
+    seriesKey,
+    yAxisID: axisId,
+    data: points,
+    borderColor: color
+  };
+
+  if (style === 'bar') {
+    return {
+      ...common,
+      type: 'bar',
+      backgroundColor: `${color}cc`,
+      borderWidth: 1,
+      barPercentage: 0.75,
+      categoryPercentage: 0.8
+    };
+  }
+
+  return {
+    ...common,
+    type: 'line',
+    backgroundColor: `${color}33`,
+    fill: false,
+    tension: 0.2,
+    pointRadius: 2,
+    pointHoverRadius: 5
+  };
+};
+
 const buildVisibleDatasets = () => {
   if (!chartSource) return [];
 
@@ -220,8 +255,25 @@ const clearChart = () => {
 const resetSeriesSelectors = () => {
   seriesASelect.disabled = true;
   seriesBSelect.disabled = true;
+  seriesATypeSelect.disabled = true;
+  seriesBTypeSelect.disabled = true;
   seriesASelect.innerHTML = '<option value="">Choose series A</option>';
   seriesBSelect.innerHTML = '<option value="">None</option>';
+  seriesATypeSelect.value = 'line';
+  seriesBTypeSelect.value = 'line';
+};
+
+const syncSeriesSelectorOptions = () => {
+  const selectedA = seriesASelect.value;
+  const selectedB = seriesBSelect.value;
+
+  Array.from(seriesASelect.options).forEach((option) => {
+    option.disabled = Boolean(option.value && option.value === selectedB);
+  });
+
+  Array.from(seriesBSelect.options).forEach((option) => {
+    option.disabled = Boolean(option.value && option.value === selectedA);
+  });
 };
 
 const detectSeriesFormat = (worksheet, headers, seriesKey, rowCount) => {
@@ -240,7 +292,16 @@ const detectSeriesFormat = (worksheet, headers, seriesKey, rowCount) => {
 const buildChart = (rows, columns) => {
   clearChart();
 
-  const { dateKey, eventKey, commentKey, seriesAKey, seriesBKey, seriesFormats } = columns;
+  const {
+    dateKey,
+    eventKey,
+    commentKey,
+    seriesAKey,
+    seriesBKey,
+    seriesAStyle,
+    seriesBStyle,
+    seriesFormats
+  } = columns;
   currentMeta = { seriesFormats, seriesAKey, seriesBKey };
 
   const points = rows
@@ -276,32 +337,24 @@ const buildChart = (rows, columns) => {
   const commentPoints = points.filter((point) => point.comment);
 
   chartSource = {
-    seriesADataset: {
+    seriesADataset: makeSeriesDataset({
       label: seriesAKey,
       seriesKey: seriesAKey,
-      yAxisID: 'y',
-      data: points.map((point) => ({ x: point.x, y: point.seriesA })),
-      borderColor: '#1d4ed8',
-      backgroundColor: 'rgba(29, 78, 216, 0.15)',
-      fill: true,
-      tension: 0.2,
-      pointRadius: 2,
-      pointHoverRadius: 5
-    },
+      axisId: 'y',
+      points: points.map((point) => ({ x: point.x, y: point.seriesA })),
+      color: SERIES_A_COLOR,
+      style: seriesAStyle
+    }),
     seriesBDataset:
       seriesBKey && points.some((point) => point.seriesB !== null)
-        ? {
+        ? makeSeriesDataset({
             label: seriesBKey,
             seriesKey: seriesBKey,
-            yAxisID: 'y1',
-            data: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB })),
-            borderColor: '#7c3aed',
-            backgroundColor: 'rgba(124, 58, 237, 0.08)',
-            fill: false,
-            tension: 0.2,
-            pointRadius: 2,
-            pointHoverRadius: 5
-          }
+            axisId: 'y1',
+            points: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB })),
+            color: SERIES_B_COLOR,
+            style: seriesBStyle
+          })
         : null,
     eventDataset:
       eventKey && eventPoints.length
@@ -473,10 +526,15 @@ const populateSeriesSelectors = () => {
 
   seriesASelect.disabled = false;
   seriesBSelect.disabled = false;
+  seriesATypeSelect.disabled = false;
+  seriesBTypeSelect.disabled = false;
 
   seriesASelect.value = options[0];
   const defaultB = options.find((key) => key !== options[0]);
   seriesBSelect.value = defaultB || '';
+  seriesATypeSelect.value = 'line';
+  seriesBTypeSelect.value = 'line';
+  syncSeriesSelectorOptions();
 };
 
 const renderSelectedSeries = () => {
@@ -512,6 +570,8 @@ const renderSelectedSeries = () => {
     commentKey: currentSheetContext.commentKey,
     seriesAKey,
     seriesBKey: seriesBKey || null,
+    seriesAStyle: seriesATypeSelect.value,
+    seriesBStyle: seriesBTypeSelect.value,
     seriesFormats
   });
 };
@@ -615,15 +675,25 @@ sheetSelect.addEventListener('change', (event) => {
 
 seriesASelect.addEventListener('change', () => {
   if (!currentSheetContext) return;
-
   if (seriesBSelect.value && seriesBSelect.value === seriesASelect.value) {
     seriesBSelect.value = '';
   }
-
+  syncSeriesSelectorOptions();
   renderSelectedSeries();
 });
 
 seriesBSelect.addEventListener('change', () => {
+  if (!currentSheetContext) return;
+  syncSeriesSelectorOptions();
+  renderSelectedSeries();
+});
+
+seriesATypeSelect.addEventListener('change', () => {
+  if (!currentSheetContext) return;
+  renderSelectedSeries();
+});
+
+seriesBTypeSelect.addEventListener('change', () => {
   if (!currentSheetContext) return;
   renderSelectedSeries();
 });
@@ -631,11 +701,15 @@ seriesBSelect.addEventListener('change', () => {
 showEventToggle.addEventListener('change', refreshAnnotationDatasets);
 showCommentToggle.addEventListener('change', refreshAnnotationDatasets);
 
-resetZoomButton.addEventListener('click', () => {
+const triggerResetZoom = (event) => {
+  if (event) event.preventDefault();
   if (!chart) return;
   chart.resetZoom();
   syncWindowFromChart();
-});
+};
+
+resetZoomButton.addEventListener('click', triggerResetZoom);
+resetZoomButton.addEventListener('touchend', triggerResetZoom, { passive: false });
 
 const setupTimelineInteractions = () => {
   let dragMode = null;
@@ -686,7 +760,7 @@ const setupTimelineInteractions = () => {
       window.removeEventListener('pointerup', onUp);
     };
 
-    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointermove', onMove, { passive: false });
     window.addEventListener('pointerup', onUp);
   };
 

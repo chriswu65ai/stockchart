@@ -5,7 +5,7 @@ body {
   overscroll-behavior: none;
 }
 :root {
-  --bg: #f4f6fb;
+  --bg: #706f74;
   --card: #ffffff;
   --text: #1f2937;
   --muted: #6b7280;
@@ -49,10 +49,15 @@ h2 {
   margin-top: 0;
 }
 
+header h1 {
+  margin: 0;
+  color: #023047;
+}
+
 .controls {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: 1.8fr 1.1fr 1.1fr 1.1fr 0.9fr 1fr 0.9fr;
+  grid-template-columns: 1.7fr 1fr 1fr 0.9fr 1fr 0.9fr 0.9fr 1fr 0.9fr;
   align-items: end;
 }
 

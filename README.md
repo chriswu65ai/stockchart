@@ -4,7 +4,7 @@ This project provides a browser-based share price chart that supports:
 
 - Uploading Excel data (`.xlsx`/`.xls`)
 - Zooming and panning through time
-- A single horizontal timeline window bar at the bottom of the chart (drag to move, resize to widen/compress timeframe)
+- A single horizontal Timeframe bar at the bottom of the chart (drag to move, resize to widen/compress timeframe)
 - Bubble annotations on key dates from the `Event` and/or `Note` columns
 - Choose Series A (left axis) and optional Series B (right axis) from non-Date/non-Event/non-Comment columns
 
@@ -43,3 +43,5 @@ Event and Comment are rendered as separate annotation series (Event in amber, Co
 Annotation tooltip text wraps to constrain width to approximately 25% of chart width.
 
 Touchscreen use: chart and timeline interactions lock page scrolling while dragging so iPad/touch gestures control the chart/timeline instead of moving the page.
+
+Series style: choose Line or Bar independently for Series A and Series B.
