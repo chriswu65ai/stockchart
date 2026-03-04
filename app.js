@@ -2,8 +2,8 @@ const fileInput = document.getElementById('excel-file');
 const sheetSelect = document.getElementById('sheet-select');
 const seriesASelect = document.getElementById('series-a-select');
 const seriesBSelect = document.getElementById('series-b-select');
-const seriesATypeSelect = document.getElementById('series-a-type');
-const seriesBTypeSelect = document.getElementById('series-b-type');
+const seriesABarToggle = document.getElementById('series-a-bar');
+const seriesBBarToggle = document.getElementById('series-b-bar');
 const resetZoomButton = document.getElementById('reset-zoom');
 const showEventToggle = document.getElementById('show-event-annotations');
 const showCommentToggle = document.getElementById('show-comment-annotations');
@@ -34,7 +34,7 @@ const COMMENT_KEYS = ['comment', 'comments', 'note', 'notes'];
 const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
 const MIN_WINDOW_PCT = 2;
 const SERIES_A_COLOR = '#023047';
-const SERIES_B_COLOR = '#FFB703';
+const SERIES_B_COLOR = '#22C4DD';
 
 const extractHttpUrl = (text) => {
   const match = String(text ?? '').match(URL_PATTERN);
@@ -152,8 +152,9 @@ const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) =
       type: 'bar',
       backgroundColor: `${color}cc`,
       borderWidth: 1,
-      barPercentage: 0.75,
-      categoryPercentage: 0.8
+      barPercentage: 0.95,
+      categoryPercentage: 1.0,
+      maxBarThickness: 36
     };
   }
 
@@ -255,12 +256,12 @@ const clearChart = () => {
 const resetSeriesSelectors = () => {
   seriesASelect.disabled = true;
   seriesBSelect.disabled = true;
-  seriesATypeSelect.disabled = true;
-  seriesBTypeSelect.disabled = true;
+  seriesABarToggle.disabled = true;
+  seriesBBarToggle.disabled = true;
   seriesASelect.innerHTML = '<option value="">Choose series A</option>';
   seriesBSelect.innerHTML = '<option value="">None</option>';
-  seriesATypeSelect.value = 'line';
-  seriesBTypeSelect.value = 'line';
+  seriesABarToggle.checked = false;
+  seriesBBarToggle.checked = false;
 };
 
 const syncSeriesSelectorOptions = () => {
@@ -450,7 +451,15 @@ const buildChart = (rows, columns) => {
         }
       },
       plugins: {
-        legend: { position: 'top' },
+        legend: {
+          position: 'top',
+          labels: {
+            filter(item, chartData) {
+              const ds = chartData.datasets[item.datasetIndex];
+              return ds?.type !== 'bubble';
+            }
+          }
+        },
         tooltip: {
           filter(tooltipItem, _index, items) {
             const bubblePresent = items.some((item) => item.dataset.type === 'bubble');
@@ -526,14 +535,14 @@ const populateSeriesSelectors = () => {
 
   seriesASelect.disabled = false;
   seriesBSelect.disabled = false;
-  seriesATypeSelect.disabled = false;
-  seriesBTypeSelect.disabled = false;
+  seriesABarToggle.disabled = false;
+  seriesBBarToggle.disabled = false;
 
   seriesASelect.value = options[0];
   const defaultB = options.find((key) => key !== options[0]);
   seriesBSelect.value = defaultB || '';
-  seriesATypeSelect.value = 'line';
-  seriesBTypeSelect.value = 'line';
+  seriesABarToggle.checked = false;
+  seriesBBarToggle.checked = false;
   syncSeriesSelectorOptions();
 };
 
@@ -570,8 +579,8 @@ const renderSelectedSeries = () => {
     commentKey: currentSheetContext.commentKey,
     seriesAKey,
     seriesBKey: seriesBKey || null,
-    seriesAStyle: seriesATypeSelect.value,
-    seriesBStyle: seriesBTypeSelect.value,
+    seriesAStyle: seriesABarToggle.checked ? 'bar' : 'line',
+    seriesBStyle: seriesBBarToggle.checked ? 'bar' : 'line',
     seriesFormats
   });
 };
@@ -688,12 +697,12 @@ seriesBSelect.addEventListener('change', () => {
   renderSelectedSeries();
 });
 
-seriesATypeSelect.addEventListener('change', () => {
+seriesABarToggle.addEventListener('change', () => {
   if (!currentSheetContext) return;
   renderSelectedSeries();
 });
 
-seriesBTypeSelect.addEventListener('change', () => {
+seriesBBarToggle.addEventListener('change', () => {
   if (!currentSheetContext) return;
   renderSelectedSeries();
 });
@@ -703,8 +712,18 @@ showCommentToggle.addEventListener('change', refreshAnnotationDatasets);
 
 const triggerResetZoom = (event) => {
   if (event) event.preventDefault();
-  if (!chart) return;
+  if (!chart || fullMinX === null || fullMaxX === null) return;
+
+  // Reset both chart zoom range and the custom timeframe selector explicitly.
+  windowStartPct = 0;
+  windowSizePct = 100;
+  renderTimelineWindow();
+
   chart.resetZoom();
+  chart.options.scales.x.min = fullMinX;
+  chart.options.scales.x.max = fullMaxX;
+  chart.update('none');
+
   syncWindowFromChart();
 };
 

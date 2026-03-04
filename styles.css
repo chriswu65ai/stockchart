@@ -5,7 +5,7 @@ body {
   overscroll-behavior: none;
 }
 :root {
-  --bg: #706f74;
+  --bg: #ffffff;
   --card: #ffffff;
   --text: #1f2937;
   --muted: #6b7280;
@@ -49,15 +49,20 @@ h2 {
   margin-top: 0;
 }
 
+header {
+  background: #22cadd;
+  margin: 0.5rem 0;
+}
+
 header h1 {
-  margin: 0;
-  color: #023047;
+  margin: 0.5rem 0;
+  color: #ffffff;
 }
 
 .controls {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: 1.7fr 1fr 1fr 0.9fr 1fr 0.9fr 0.9fr 1fr 0.9fr;
+  grid-template-columns: 1.6fr 1fr 1fr 0.85fr 1fr 0.85fr 1fr 0.95fr;
   align-items: end;
 }
 
@@ -227,4 +232,17 @@ body.is-timeline-dragging {
 
 #reset-zoom {
   touch-action: manipulation;
+}
+
+.event-toggle {
+  color: #f59e0b;
+}
+
+.comment-toggle {
+  color: #22c55e;
+}
+
+.toggle-stack {
+  display: grid;
+  gap: 0.25rem;
 }
