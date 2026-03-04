@@ -427,7 +427,7 @@ fileInput.addEventListener('change', async (event) => {
 
   try {
     const data = await file.arrayBuffer();
-    workbook = XLSX.read(data, { cellStyles: true });
+    workbook = XLSX.read(data, { cellNF: true });
 
     sheetSelect.innerHTML = '<option value="">Choose a sheet</option>';
     workbook.SheetNames.forEach((name) => {
@@ -437,7 +437,14 @@ fileInput.addEventListener('change', async (event) => {
       sheetSelect.append(option);
     });
 
+    if (!workbook.SheetNames.length) {
+      sheetSelect.disabled = true;
+      updateStatus(`Loaded ${file.name}, but no sheets were found.`, true);
+      return;
+    }
+
     sheetSelect.disabled = false;
+    sheetSelect.value = '';
     updateStatus(`Loaded ${file.name}. Select a sheet to render the chart.`);
   } catch (error) {
     workbook = null;
