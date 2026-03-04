@@ -3,24 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Interactive Share Price Chart</title>
-    <link rel="stylesheet" href="styles.css" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Focus Charts Interactive</title>
+    <link rel="stylesheet" href="styles.css?v=20260304b" />
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>
-    <script src="app.js" defer></script>
+    <script src="app.js?v=20260304d" defer></script>
   </head>
   <body>
     <main class="layout">
       <header>
-        <h1>Focus Charts Viewer</h1>
+        <h1>Focus Charts Interactive</h1>
       </header>
 
       <section class="controls" aria-label="Upload and chart controls">
         <div class="control-item">
           <label class="file-label" for="excel-file">Excel file (.xlsx, .xls)</label>
-          <input id="excel-file" type="file" accept=".xlsx,.xls" />
+          <input id="excel-file" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/octet-stream" />
         </div>
 
         <div class="control-item">
@@ -56,6 +59,13 @@
         </div>
 
         <div class="control-item checkbox-item toggle-stack">
+          <label class="toggle-control" for="disable-links">
+            <input id="disable-links" type="checkbox" />
+            Disable links
+          </label>
+        </div>
+
+        <div class="control-item checkbox-item toggle-stack annotation-toggle-stack">
           <label class="toggle-control event-toggle" for="show-event-annotations">
             <input id="show-event-annotations" type="checkbox" checked />
             Show events
@@ -64,10 +74,6 @@
             <input id="show-comment-annotations" type="checkbox" checked />
             Show comments
           </label>
-        </div>
-
-        <div class="control-item button-item">
-          <button id="reset-zoom" type="button" disabled>Reset Zoom</button>
         </div>
       </section>
 
@@ -86,6 +92,14 @@
             <span id="timeline-handle-left" class="timeline-handle" aria-hidden="true"></span>
             <span id="timeline-handle-right" class="timeline-handle" aria-hidden="true"></span>
           </div>
+        </div>
+
+        <div class="quick-timeframes" aria-label="Quick timeframe presets">
+          <button class="quick-timeframe-btn" type="button" data-years="1" disabled>1yr</button>
+          <button class="quick-timeframe-btn" type="button" data-years="3" disabled>3yr</button>
+          <button class="quick-timeframe-btn" type="button" data-years="5" disabled>5yr</button>
+          <button class="quick-timeframe-btn" type="button" data-years="10" disabled>10yr</button>
+          <button id="reset-zoom" class="quick-timeframe-btn" type="button" disabled>Reset Zoom</button>
         </div>
       </section>
 
