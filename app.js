@@ -644,7 +644,10 @@ const buildChart = (rows, columns) => {
     syncWindowFromChart();
   }
 
-  if (chart) chart.update('none');
+  if (chart) {
+    chart.clear();
+    chart.update();
+  }
 
   resetZoomButton.disabled = false;
   setQuickTimeframeButtonsDisabled(false);
