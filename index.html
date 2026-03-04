@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Share Price Chart</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <main class="layout">
+      <header>
+        <h1>Share Price Timeline</h1>
+        <p>
+          Upload an Excel file containing at least two columns:
+          <strong>Date</strong> and <strong>Price</strong>. Optional columns:
+          <strong>Event</strong> and <strong>Note</strong> for annotated bubbles.
+        </p>
+      </header>
+
+      <section class="controls" aria-label="Upload and chart controls">
+        <label class="file-label" for="excel-file">Excel file (.xlsx, .xls)</label>
+        <input id="excel-file" type="file" accept=".xlsx,.xls" />
+
+        <label for="sheet-select">Sheet</label>
+        <select id="sheet-select" disabled>
+          <option value="">Choose a sheet</option>
+        </select>
+
+        <button id="reset-zoom" type="button" disabled>Reset Zoom</button>
+
+        <label class="toggle-control" for="toggle-annotations">
+          <input id="toggle-annotations" type="checkbox" checked />
+          Show Event/Note annotations
+        </label>
+      </section>
+
+      <section class="status-panel" aria-live="polite">
+        <p id="status">Upload your file to render the chart.</p>
+      </section>
+
+      <section class="chart-panel">
+        <div class="chart-container">
+          <canvas id="share-chart" aria-label="Interactive share price chart"></canvas>
+        </div>
+        <label class="scroll-label" for="chart-scroll">Timeline scroll</label>
+        <input id="chart-scroll" type="range" min="0" max="0" value="0" disabled />
+      </section>
+
+      <section class="tips">
+        <h2>How to use</h2>
+        <ul>
+          <li>Scroll to zoom horizontally, or pinch on touch devices.</li>
+          <li>Drag the chart to pan through time, or use the timeline scroll bar.</li>
+          <li>Hover event/note bubbles to view annotation text, and click a bubble when it contains a URL.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
