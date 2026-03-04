@@ -30,6 +30,20 @@
           </select>
         </div>
 
+
+        <div class="control-item">
+          <label for="series-a-select">Series A (left axis)</label>
+          <select id="series-a-select" disabled>
+            <option value="">Choose series A</option>
+          </select>
+        </div>
+
+        <div class="control-item">
+          <label for="series-b-select">Series B (right axis)</label>
+          <select id="series-b-select" disabled>
+            <option value="">None</option>
+          </select>
+        </div>
         <div class="control-item checkbox-item">
           <label class="toggle-control" for="show-event-annotations">
             <input id="show-event-annotations" type="checkbox" checked />
@@ -70,7 +84,7 @@
       <section class="tips">
         <h2>How to use</h2>
         <ul>
-          <li>Upload an Excel file containing at least two columns: <strong>Date</strong> and <strong>Price</strong>. Optional columns: <strong>Event</strong> and <strong>Comment</strong> for annotated bubbles.</li>
+          <li>Upload an Excel file containing at least two columns: <strong>Date</strong> and <strong>Price</strong>. Optional columns: <strong>Event</strong> and <strong>Comment</strong> for annotated bubbles. Series A/B cannot use Event/Comment columns.</li>
           <li>Scroll to zoom horizontally, or pinch on touch devices.</li>
           <li>Drag the chart to pan through time, or use the timeline window bar (drag center to move, drag edges to expand/compress timeframe).</li>
           <li>Hover event/comment bubbles to view annotation text, and click a bubble when it contains a URL.</li>

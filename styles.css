@@ -1,3 +1,9 @@
+
+
+html,
+body {
+  overscroll-behavior: none;
+}
 :root {
   --bg: #f4f6fb;
   --card: #ffffff;
@@ -46,7 +52,7 @@ h2 {
 .controls {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: 2fr 1.25fr 1fr 1fr 0.9fr;
+  grid-template-columns: 1.8fr 1.1fr 1.1fr 1.1fr 0.9fr 1fr 0.9fr;
   align-items: end;
 }
 
@@ -109,12 +115,14 @@ button:disabled {
   position: relative;
   height: 450px;
   width: 100%;
+  touch-action: none;
 }
 
 #share-chart {
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
 }
 
 .scroll-label {
@@ -131,7 +139,10 @@ button:disabled {
   border-radius: 999px;
   background: #e5e7eb;
   border: 1px solid #cbd5e1;
+  touch-action: none;
+  user-select: none;
 }
+
 
 .timeline-window.is-disabled {
   opacity: 0.55;
@@ -194,6 +205,21 @@ button:disabled {
 
 @media (max-width: 980px) {
   .controls {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
   }
+}
+
+@media (max-width: 700px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.is-timeline-dragging {
+  overflow: hidden;
+  touch-action: none;
+}
+
+#reset-zoom {
+  touch-action: manipulation;
 }

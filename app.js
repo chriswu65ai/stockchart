@@ -1,5 +1,7 @@
 const fileInput = document.getElementById('excel-file');
 const sheetSelect = document.getElementById('sheet-select');
+const seriesASelect = document.getElementById('series-a-select');
+const seriesBSelect = document.getElementById('series-b-select');
 const resetZoomButton = document.getElementById('reset-zoom');
 const showEventToggle = document.getElementById('show-event-annotations');
 const showCommentToggle = document.getElementById('show-comment-annotations');
@@ -12,8 +14,9 @@ const timelineHandleRight = document.getElementById('timeline-handle-right');
 
 let workbook = null;
 let chart = null;
-let currentMeta = null;
 let chartSource = null;
+let currentMeta = null;
+let currentSheetContext = null;
 
 let fullMinX = null;
 let fullMaxX = null;
@@ -24,10 +27,8 @@ let windowSizePct = 100;
 let isTimelineReady = false;
 
 const DATE_KEYS = ['date', 'month', 'time'];
-const PRICE_KEYS = ['price', 'share price', 'close', 'value'];
 const EVENT_KEYS = ['event', 'title', 'milestone'];
 const COMMENT_KEYS = ['comment', 'comments', 'note', 'notes'];
-
 const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
 const MIN_WINDOW_PCT = 2;
 
@@ -62,6 +63,12 @@ const parseDate = (value) => {
   return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
+const parseNumeric = (value) => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() === '') return NaN;
+  return Number(value);
+};
+
 const formatDateOnly = (value) =>
   new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(
     new Date(value)
@@ -72,11 +79,12 @@ const updateStatus = (message, isError = false) => {
   statusText.style.color = isError ? '#991b1b' : 'inherit';
 };
 
-const formatPriceValue = (value) => {
-  if (!currentMeta?.priceFormat) return value;
+const formatSeriesValue = (seriesKey, value) => {
+  const fmt = currentMeta?.seriesFormats?.[seriesKey];
+  if (!fmt) return value;
 
   try {
-    return XLSX.SSF.format(currentMeta.priceFormat, value);
+    return XLSX.SSF.format(fmt, value);
   } catch (_error) {
     return value;
   }
@@ -128,7 +136,8 @@ const wrapByPixelWidth = (text, chartInstance, maxWidthPx) => {
 const buildVisibleDatasets = () => {
   if (!chartSource) return [];
 
-  const datasets = [chartSource.priceDataset];
+  const datasets = [chartSource.seriesADataset];
+  if (chartSource.seriesBDataset) datasets.push(chartSource.seriesBDataset);
   if (chartSource.eventDataset && showEventToggle.checked) datasets.push(chartSource.eventDataset);
   if (chartSource.commentDataset && showCommentToggle.checked) datasets.push(chartSource.commentDataset);
   return datasets;
@@ -198,29 +207,57 @@ const clearChart = () => {
     chart.destroy();
     chart = null;
   }
+
   chartSource = null;
+  currentMeta = null;
+  fullMinX = null;
+  fullMaxX = null;
+  viewSpan = null;
   resetZoomButton.disabled = true;
   resetTimelineWindow();
+};
+
+const resetSeriesSelectors = () => {
+  seriesASelect.disabled = true;
+  seriesBSelect.disabled = true;
+  seriesASelect.innerHTML = '<option value="">Choose series A</option>';
+  seriesBSelect.innerHTML = '<option value="">None</option>';
+};
+
+const detectSeriesFormat = (worksheet, headers, seriesKey, rowCount) => {
+  const colIndex = headers.indexOf(seriesKey);
+  if (colIndex < 0) return '';
+
+  for (let rowIndex = 1; rowIndex <= rowCount; rowIndex += 1) {
+    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+    const cell = worksheet[cellAddress];
+    if (cell && typeof cell.v === 'number' && cell.z) return cell.z;
+  }
+
+  return '';
 };
 
 const buildChart = (rows, columns) => {
   clearChart();
 
-  const { dateKey, priceKey, eventKey, commentKey, priceFormat } = columns;
-  currentMeta = { priceFormat };
+  const { dateKey, eventKey, commentKey, seriesAKey, seriesBKey, seriesFormats } = columns;
+  currentMeta = { seriesFormats, seriesAKey, seriesBKey };
 
   const points = rows
     .map((row) => {
       const date = parseDate(row[dateKey]);
-      const price = Number(row[priceKey]);
-      if (!date || Number.isNaN(price)) return null;
+      const seriesAValue = parseNumeric(row[seriesAKey]);
+      const seriesBValue = seriesBKey ? parseNumeric(row[seriesBKey]) : NaN;
+
+      if (!date || Number.isNaN(seriesAValue)) return null;
 
       const event = eventKey && row[eventKey] ? String(row[eventKey]).trim() : '';
       const comment = commentKey && row[commentKey] ? String(row[commentKey]).trim() : '';
 
       return {
         x: date,
-        y: price,
+        seriesA: seriesAValue,
+        seriesB: Number.isNaN(seriesBValue) ? null : seriesBValue,
         event,
         comment,
         eventLink: extractHttpUrl(event),
@@ -231,7 +268,7 @@ const buildChart = (rows, columns) => {
     .sort((a, b) => a.x - b.x);
 
   if (!points.length) {
-    updateStatus('No valid rows were found. Check date and price values in your file.', true);
+    updateStatus('No valid rows were found for the selected date and series columns.', true);
     return;
   }
 
@@ -239,9 +276,11 @@ const buildChart = (rows, columns) => {
   const commentPoints = points.filter((point) => point.comment);
 
   chartSource = {
-    priceDataset: {
-      label: priceKey,
-      data: points,
+    seriesADataset: {
+      label: seriesAKey,
+      seriesKey: seriesAKey,
+      yAxisID: 'y',
+      data: points.map((point) => ({ x: point.x, y: point.seriesA })),
       borderColor: '#1d4ed8',
       backgroundColor: 'rgba(29, 78, 216, 0.15)',
       fill: true,
@@ -249,6 +288,21 @@ const buildChart = (rows, columns) => {
       pointRadius: 2,
       pointHoverRadius: 5
     },
+    seriesBDataset:
+      seriesBKey && points.some((point) => point.seriesB !== null)
+        ? {
+            label: seriesBKey,
+            seriesKey: seriesBKey,
+            yAxisID: 'y1',
+            data: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB })),
+            borderColor: '#7c3aed',
+            backgroundColor: 'rgba(124, 58, 237, 0.08)',
+            fill: false,
+            tension: 0.2,
+            pointRadius: 2,
+            pointHoverRadius: 5
+          }
+        : null,
     eventDataset:
       eventKey && eventPoints.length
         ? {
@@ -256,7 +310,7 @@ const buildChart = (rows, columns) => {
             label: eventKey,
             data: eventPoints.map((point) => ({
               x: point.x,
-              y: point.y,
+              y: point.seriesA,
               r: 7,
               annotation: point.event,
               link: point.eventLink
@@ -274,7 +328,7 @@ const buildChart = (rows, columns) => {
             label: 'Comment',
             data: commentPoints.map((point) => ({
               x: point.x,
-              y: point.y,
+              y: point.seriesA,
               r: 7,
               annotation: point.comment,
               link: point.commentLink
@@ -321,10 +375,23 @@ const buildChart = (rows, columns) => {
           title: { display: true, text: dateKey }
         },
         y: {
-          title: { display: true, text: priceKey },
+          position: 'left',
+          title: { display: true, text: seriesAKey },
           ticks: {
             callback(value) {
-              return formatPriceValue(value);
+              return formatSeriesValue(seriesAKey, value);
+            }
+          }
+        },
+        y1: {
+          display: Boolean(seriesBKey && chartSource.seriesBDataset),
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: seriesBKey || '' },
+          ticks: {
+            callback(value) {
+              if (!seriesBKey) return value;
+              return formatSeriesValue(seriesBKey, value);
             }
           }
         }
@@ -347,7 +414,8 @@ const buildChart = (rows, columns) => {
                 return wrapByPixelWidth(context.raw?.annotation || '', context.chart, maxWidth);
               }
 
-              return `${context.dataset.label}: ${formatPriceValue(context.parsed.y)}`;
+              const key = context.dataset.seriesKey;
+              return `${context.dataset.label}: ${formatSeriesValue(key, context.parsed.y)}`;
             }
           }
         },
@@ -370,21 +438,82 @@ const buildChart = (rows, columns) => {
 
   resetZoomButton.disabled = false;
   updateStatus(
-    `Rendered ${points.length} points with ${eventPoints.length} events and ${commentPoints.length} comments.`
+    `Rendered ${points.length} points (${seriesAKey}${seriesBKey ? ` + ${seriesBKey}` : ''}) with ${eventPoints.length} events and ${commentPoints.length} comments.`
   );
 };
 
-const detectPriceFormat = (worksheet, headers, priceKey, rowCount) => {
-  const priceCol = headers.indexOf(priceKey);
-  if (priceCol < 0) return '';
-
-  for (let rowIndex = 1; rowIndex <= rowCount; rowIndex += 1) {
-    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: priceCol });
-    const cell = worksheet[cellAddress];
-    if (cell && typeof cell.v === 'number' && cell.z) return cell.z;
+const populateSeriesSelectors = () => {
+  if (!currentSheetContext) {
+    resetSeriesSelectors();
+    return;
   }
 
-  return '';
+  const options = currentSheetContext.seriesCandidates;
+  if (!options.length) {
+    resetSeriesSelectors();
+    updateStatus('No numeric series columns found besides Date/Event/Comment.', true);
+    return;
+  }
+
+  seriesASelect.innerHTML = '';
+  options.forEach((key) => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = key;
+    seriesASelect.append(option);
+  });
+
+  seriesBSelect.innerHTML = '<option value="">None</option>';
+  options.forEach((key) => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = key;
+    seriesBSelect.append(option);
+  });
+
+  seriesASelect.disabled = false;
+  seriesBSelect.disabled = false;
+
+  seriesASelect.value = options[0];
+  const defaultB = options.find((key) => key !== options[0]);
+  seriesBSelect.value = defaultB || '';
+};
+
+const renderSelectedSeries = () => {
+  if (!currentSheetContext) return;
+
+  const seriesAKey = seriesASelect.value;
+  const seriesBKey = seriesBSelect.value;
+
+  if (!seriesAKey) {
+    updateStatus('Please select Series A to render the chart.', true);
+    return;
+  }
+
+  if (seriesBKey && seriesBKey === seriesAKey) {
+    updateStatus('Series A and Series B cannot be the same column.', true);
+    return;
+  }
+
+  const headers = currentSheetContext.headers;
+  const worksheet = currentSheetContext.worksheet;
+  const rowCount = currentSheetContext.rows.length;
+
+  const seriesFormats = {
+    [seriesAKey]: detectSeriesFormat(worksheet, headers, seriesAKey, rowCount)
+  };
+  if (seriesBKey) {
+    seriesFormats[seriesBKey] = detectSeriesFormat(worksheet, headers, seriesBKey, rowCount);
+  }
+
+  buildChart(currentSheetContext.rows, {
+    dateKey: currentSheetContext.dateKey,
+    eventKey: currentSheetContext.eventKey,
+    commentKey: currentSheetContext.commentKey,
+    seriesAKey,
+    seriesBKey: seriesBKey || null,
+    seriesFormats
+  });
 };
 
 const parseSheet = (sheetName) => {
@@ -392,31 +521,56 @@ const parseSheet = (sheetName) => {
   const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
   if (!rows.length) {
+    resetSeriesSelectors();
     updateStatus('Selected sheet has no data rows.', true);
     return;
   }
 
   const headers = Object.keys(rows[0]);
   const dateKey = getFirstMatchingKey(headers, DATE_KEYS);
-  const priceKey = getFirstMatchingKey(headers, PRICE_KEYS);
   const eventKey = getFirstMatchingKey(headers, EVENT_KEYS);
   const commentKey = getFirstMatchingKey(headers, COMMENT_KEYS);
 
-  if (!dateKey || !priceKey) {
-    updateStatus(
-      'Unable to find required columns. Expected headers like Date and Price (or synonyms).',
-      true
-    );
+  if (!dateKey) {
+    resetSeriesSelectors();
+    updateStatus('Unable to find required date column.', true);
     return;
   }
 
-  const priceFormat = detectPriceFormat(worksheet, headers, priceKey, rows.length);
-  buildChart(rows, { dateKey, priceKey, eventKey, commentKey, priceFormat });
+  const seriesCandidates = headers.filter((key) => {
+    if (key === dateKey || key === eventKey || key === commentKey) return false;
+
+    return rows.some((row) => {
+      const value = parseNumeric(row[key]);
+      return !Number.isNaN(value);
+    });
+  });
+
+  currentSheetContext = {
+    worksheet,
+    rows,
+    headers,
+    dateKey,
+    eventKey,
+    commentKey,
+    seriesCandidates
+  };
+
+  populateSeriesSelectors();
+
+  if (!seriesCandidates.length) {
+    clearChart();
+    return;
+  }
+
+  renderSelectedSeries();
 };
 
 fileInput.addEventListener('change', async (event) => {
   const [file] = event.target.files;
   clearChart();
+  currentSheetContext = null;
+  resetSeriesSelectors();
 
   if (!file) {
     updateStatus('No file selected.');
@@ -445,7 +599,7 @@ fileInput.addEventListener('change', async (event) => {
 
     sheetSelect.disabled = false;
     sheetSelect.value = '';
-    updateStatus(`Loaded ${file.name}. Select a sheet to render the chart.`);
+    updateStatus(`Loaded ${file.name}. Select a sheet, then choose Series A/Series B.`);
   } catch (error) {
     workbook = null;
     sheetSelect.disabled = true;
@@ -457,6 +611,21 @@ sheetSelect.addEventListener('change', (event) => {
   const sheetName = event.target.value;
   if (!sheetName || !workbook) return;
   parseSheet(sheetName);
+});
+
+seriesASelect.addEventListener('change', () => {
+  if (!currentSheetContext) return;
+
+  if (seriesBSelect.value && seriesBSelect.value === seriesASelect.value) {
+    seriesBSelect.value = '';
+  }
+
+  renderSelectedSeries();
+});
+
+seriesBSelect.addEventListener('change', () => {
+  if (!currentSheetContext) return;
+  renderSelectedSeries();
 });
 
 showEventToggle.addEventListener('change', refreshAnnotationDatasets);
@@ -479,8 +648,11 @@ const setupTimelineInteractions = () => {
     startX = event.clientX;
     startWindow = { start: windowStartPct, size: windowSizePct };
 
+    document.body.classList.add('is-timeline-dragging');
+
     const onMove = (moveEvent) => {
       if (!dragMode) return;
+      moveEvent.preventDefault();
       const rect = timelineWindow.getBoundingClientRect();
       if (rect.width <= 0) return;
 
@@ -489,7 +661,10 @@ const setupTimelineInteractions = () => {
       if (dragMode === 'move') {
         windowStartPct = Math.max(0, Math.min(100 - startWindow.size, startWindow.start + deltaPct));
       } else if (dragMode === 'left') {
-        const nextStart = Math.max(0, Math.min(startWindow.start + startWindow.size - MIN_WINDOW_PCT, startWindow.start + deltaPct));
+        const nextStart = Math.max(
+          0,
+          Math.min(startWindow.start + startWindow.size - MIN_WINDOW_PCT, startWindow.start + deltaPct)
+        );
         const nextSize = startWindow.size + (startWindow.start - nextStart);
         windowStartPct = nextStart;
         windowSizePct = Math.max(MIN_WINDOW_PCT, Math.min(100, nextSize));
@@ -506,6 +681,7 @@ const setupTimelineInteractions = () => {
 
     const onUp = () => {
       dragMode = null;
+      document.body.classList.remove('is-timeline-dragging');
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
@@ -515,19 +691,26 @@ const setupTimelineInteractions = () => {
   };
 
   timelineSelection.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
     if (event.target === timelineHandleLeft || event.target === timelineHandleRight) return;
+    timelineSelection.setPointerCapture?.(event.pointerId);
     beginDrag('move', event);
   });
 
   timelineHandleLeft.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
     event.stopPropagation();
+    timelineHandleLeft.setPointerCapture?.(event.pointerId);
     beginDrag('left', event);
   });
 
   timelineHandleRight.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
     event.stopPropagation();
+    timelineHandleRight.setPointerCapture?.(event.pointerId);
     beginDrag('right', event);
   });
 };
 
+resetSeriesSelectors();
 setupTimelineInteractions();
