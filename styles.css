@@ -74,11 +74,6 @@ header h1 {
   align-self: center;
 }
 
-.button-item {
-  align-self: stretch;
-  display: flex;
-}
-
 .file-label,
 label {
   font-size: 0.875rem;
@@ -232,6 +227,7 @@ body.is-timeline-dragging {
 
 #reset-zoom {
   touch-action: manipulation;
+  width: auto;
 }
 
 .event-toggle {
@@ -245,4 +241,23 @@ body.is-timeline-dragging {
 .toggle-stack {
   display: grid;
   gap: 0.25rem;
+}
+
+.annotation-toggle-stack {
+  justify-self: end;
+}
+
+.quick-timeframes {
+  margin-top: 0.65rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.quick-timeframe-btn {
+  width: auto;
+  min-width: 3.25rem;
+  padding: 0.35rem 0.7rem;
+  line-height: 1.1;
 }
