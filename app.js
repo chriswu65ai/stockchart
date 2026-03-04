@@ -160,9 +160,9 @@ const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) =
       type: 'bar',
       backgroundColor: `${color}cc`,
       borderWidth: 1,
-      barPercentage: 0.95,
-      categoryPercentage: 1.0,
-      maxBarThickness: 36
+      barPercentage: 1.0,
+      categoryPercentage: 0.9,
+      maxBarThickness: 64
     };
   }
 
@@ -424,13 +424,25 @@ const buildChart = (rows, columns) => {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'nearest', intersect: false },
-      onClick(_event, activeElements, chartInstance) {
-        if (!activeElements.length) return;
-        const { datasetIndex, index } = activeElements[0];
-        const dataset = chartInstance.data.datasets[datasetIndex];
-        if (dataset.type !== 'bubble') return;
-        const target = dataset.data[index];
+      onClick(event, _activeElements, chartInstance) {
+        const hitElements = chartInstance.getElementsAtEventForMode(
+          event,
+          'nearest',
+          { intersect: true },
+          false
+        );
+
+        const bubbleHit = hitElements.find((item) => {
+          const ds = chartInstance.data.datasets[item.datasetIndex];
+          return ds?.type === 'bubble';
+        });
+
+        if (!bubbleHit) return;
+
+        const dataset = chartInstance.data.datasets[bubbleHit.datasetIndex];
+        const target = dataset?.data?.[bubbleHit.index];
         if (!target?.link) return;
+
         window.open(target.link, '_blank', 'noopener,noreferrer');
       },
       onHover(_event, activeElements, chartInstance) {
