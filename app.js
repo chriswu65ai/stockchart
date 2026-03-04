@@ -76,10 +76,49 @@ const getFirstMatchingKey = (headers, candidates) =>
 const parseDate = (value) => {
   if (value instanceof Date) return value;
 
+  const buildSafeDate = (year, month, day) => {
+    const y = Number(year);
+    const m = Number(month);
+    const d = Number(day);
+    if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+
+    const dt = new Date(y, m - 1, d);
+    if (Number.isNaN(dt.getTime())) return null;
+    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+    return dt;
+  };
+
   if (typeof value === 'number') {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (!parsed) return null;
-    return new Date(parsed.y, parsed.m - 1, parsed.d);
+    return buildSafeDate(parsed.y, parsed.m, parsed.d);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const split = trimmed.match(/^(\d{1,4})[-\/](\d{1,2})[-\/](\d{1,4})(?:\s.*)?$/);
+    if (split) {
+      const a = Number(split[1]);
+      const b = Number(split[2]);
+      const c = Number(split[3]);
+
+      // YYYY-MM-DD / YYYY/MM/DD
+      if (split[1].length === 4) {
+        const iso = buildSafeDate(a, b, c);
+        if (iso) return iso;
+      }
+
+      // DD/MM/YYYY or MM/DD/YYYY (and 2-digit year variants)
+      const year = split[3].length === 2 ? Number(`20${split[3]}`) : c;
+      const preferDMY = a > 12 || (a <= 12 && b <= 12);
+      const first = preferDMY ? buildSafeDate(year, b, a) : buildSafeDate(year, a, b);
+      if (first) return first;
+
+      const second = preferDMY ? buildSafeDate(year, a, b) : buildSafeDate(year, b, a);
+      if (second) return second;
+    }
   }
 
   if (typeof value === 'string') {
@@ -799,8 +838,12 @@ fileInput.addEventListener('change', async (event) => {
     sheetSelect.value = firstSheet || '';
 
     if (firstSheet) {
-      parseSheet(firstSheet);
-      updateStatus(`Loaded ${file.name}. Showing ${firstSheet}. You can change Sheet/Series selections anytime.`);
+      try {
+        parseSheet(firstSheet);
+        updateStatus(`Loaded ${file.name}. Showing ${firstSheet}. You can change Sheet/Series selections anytime.`);
+      } catch (parseError) {
+        updateStatus(`Loaded ${file.name}, but failed to render ${firstSheet}: ${parseError.message}`, true);
+      }
     } else {
       updateStatus(`Loaded ${file.name}. Select a sheet, then choose Series A/Series B.`);
     }
