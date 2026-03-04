@@ -35,7 +35,7 @@ const COMMENT_KEYS = ['comment', 'comments', 'note', 'notes'];
 const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
 const MIN_WINDOW_PCT = 2;
 const SERIES_A_COLOR = '#023047';
-const SERIES_B_COLOR = '#22C4DD';
+const SERIES_B_COLOR = '#ff5252';
 
 const extractHttpUrl = (text) => {
   const match = String(text ?? '').match(URL_PATTERN);
@@ -178,7 +178,7 @@ const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) =
       type: 'bar',
       backgroundColor: `${color}cc`,
       borderWidth: 1,
-      barPercentage: 5.0,
+      barPercentage: 6.0,
       categoryPercentage: 0.9,
       maxBarThickness: 64
     };
@@ -264,13 +264,11 @@ const applyWindowToChart = () => {
   renderTimelineWindow();
 };
 
-const getCurrentWindowBounds = () => {
-  if (!chart || !chart.scales?.x) return null;
+const getCurrentTimelineWindow = () => {
+  if (!isTimelineReady) return null;
+  if (!Number.isFinite(windowStartPct) || !Number.isFinite(windowSizePct)) return null;
 
-  const { min, max } = chart.scales.x;
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
-
-  return { min, max };
+  return { start: windowStartPct, size: windowSizePct };
 };
 
 const clearChart = () => {
@@ -388,21 +386,6 @@ const buildChart = (rows, columns) => {
 
   const nextFullMinX = points[0].x.getTime();
   const nextFullMaxX = points[points.length - 1].x.getTime();
-  let preservedMinX = null;
-  let preservedMaxX = null;
-
-  if (columns.preserveWindow) {
-    const preservedSpan = columns.preserveWindow.max - columns.preserveWindow.min;
-    if (preservedSpan > 0) {
-      preservedMinX = Math.max(nextFullMinX, columns.preserveWindow.min);
-      preservedMaxX = Math.min(nextFullMaxX, columns.preserveWindow.max);
-
-      if (preservedMaxX <= preservedMinX) {
-        preservedMinX = null;
-        preservedMaxX = null;
-      }
-    }
-  }
 
   chartSource = {
     seriesADataset: makeSeriesDataset({
@@ -581,8 +564,19 @@ const buildChart = (rows, columns) => {
   fullMinX = nextFullMinX;
   fullMaxX = nextFullMaxX;
   syncBubbleLinks(chart);
+
+  const preservedTimeline = columns.preserveTimeline;
+  if (preservedTimeline && Number.isFinite(preservedTimeline.start) && Number.isFinite(preservedTimeline.size)) {
+    windowSizePct = Math.max(MIN_WINDOW_PCT, Math.min(100, preservedTimeline.size));
+    windowStartPct = Math.max(0, Math.min(100 - windowSizePct, preservedTimeline.start));
+    isTimelineReady = true;
+    timelineWindow.classList.remove('is-disabled');
+    applyWindowToChart();
+  } else {
+    syncWindowFromChart();
+  }
+
   if (chart) chart.update('none');
-  syncWindowFromChart();
 
   resetZoomButton.disabled = false;
   updateStatus(
@@ -659,7 +653,7 @@ const renderSelectedSeries = () => {
     seriesFormats[seriesBKey] = detectSeriesFormat(worksheet, headers, seriesBKey, rowCount);
   }
 
-  const preserveWindow = getCurrentWindowBounds();
+  const preserveTimeline = getCurrentTimelineWindow();
 
   buildChart(currentSheetContext.rows, {
     dateKey: currentSheetContext.dateKey,
@@ -672,7 +666,7 @@ const renderSelectedSeries = () => {
     seriesAStyle: seriesABarToggle.checked ? 'bar' : 'line',
     seriesBStyle: seriesBBarToggle.checked ? 'bar' : 'line',
     seriesFormats,
-    preserveWindow
+    preserveTimeline
   });
 };
 
