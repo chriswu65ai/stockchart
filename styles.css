@@ -89,12 +89,19 @@ button:disabled {
 }
 
 .chart-panel {
-  min-height: 480px;
+  min-height: 0;
+}
+
+.chart-container {
+  position: relative;
+  height: 450px;
+  width: 100%;
 }
 
 #share-chart {
   width: 100%;
-  height: 450px;
+  height: 100%;
+  display: block;
 }
 
 .tips ul {
