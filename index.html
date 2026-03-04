@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Share Price Chart</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <main class="layout">
+      <header>
+        <h1>Share Price Timeline</h1>
+      </header>
+
+      <section class="controls" aria-label="Upload and chart controls">
+        <div class="control-item">
+          <label class="file-label" for="excel-file">Excel file (.xlsx, .xls)</label>
+          <input id="excel-file" type="file" accept=".xlsx,.xls" />
+        </div>
+
+        <div class="control-item">
+          <label for="sheet-select">Sheet</label>
+          <select id="sheet-select" disabled>
+            <option value="">Choose a sheet</option>
+          </select>
+        </div>
+
+
+        <div class="control-item">
+          <label for="series-a-select">Series A (left axis)</label>
+          <select id="series-a-select" disabled>
+            <option value="">Choose series A</option>
+          </select>
+        </div>
+
+        <div class="control-item">
+          <label for="series-b-select">Series B (right axis)</label>
+          <select id="series-b-select" disabled>
+            <option value="">None</option>
+          </select>
+        </div>
+        <div class="control-item checkbox-item">
+          <label class="toggle-control" for="show-event-annotations">
+            <input id="show-event-annotations" type="checkbox" checked />
+            Show events
+          </label>
+        </div>
+
+        <div class="control-item checkbox-item">
+          <label class="toggle-control" for="show-comment-annotations">
+            <input id="show-comment-annotations" type="checkbox" checked />
+            Show comments
+          </label>
+        </div>
+
+        <div class="control-item button-item">
+          <button id="reset-zoom" type="button" disabled>Reset Zoom</button>
+        </div>
+      </section>
+
+      <section class="status-panel" aria-live="polite">
+        <p id="status">Upload your file to render the chart.</p>
+      </section>
+
+      <section class="chart-panel">
+        <div class="chart-container">
+          <canvas id="share-chart" aria-label="Interactive share price chart"></canvas>
+        </div>
+
+        <label class="scroll-label" for="timeline-window">Timeline window</label>
+        <div id="timeline-window" class="timeline-window" role="slider" aria-label="Timeline window control">
+          <div id="timeline-selection" class="timeline-selection">
+            <span id="timeline-handle-left" class="timeline-handle" aria-hidden="true"></span>
+            <span id="timeline-handle-right" class="timeline-handle" aria-hidden="true"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="tips">
+        <h2>How to use</h2>
+        <ul>
+          <li>Upload an Excel file containing at least two columns: <strong>Date</strong> and <strong>Price</strong>. Optional columns: <strong>Event</strong> and <strong>Comment</strong> for annotated bubbles. Series A/B cannot use Event/Comment columns.</li>
+          <li>Scroll to zoom horizontally, or pinch on touch devices.</li>
+          <li>Drag the chart to pan through time, or use the timeline window bar (drag center to move, drag edges to expand/compress timeframe).</li>
+          <li>Hover event/comment bubbles to view annotation text, and click a bubble when it contains a URL.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
