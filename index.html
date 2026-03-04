@@ -32,6 +32,11 @@
         </select>
 
         <button id="reset-zoom" type="button" disabled>Reset Zoom</button>
+
+        <label class="toggle-control" for="toggle-annotations">
+          <input id="toggle-annotations" type="checkbox" checked />
+          Show Event/Note annotations
+        </label>
       </section>
 
       <section class="status-panel" aria-live="polite">
@@ -40,14 +45,16 @@
 
       <section class="chart-panel">
         <canvas id="share-chart" aria-label="Interactive share price chart"></canvas>
+        <label class="scroll-label" for="chart-scroll">Timeline scroll</label>
+        <input id="chart-scroll" type="range" min="0" max="0" value="0" disabled />
       </section>
 
       <section class="tips">
         <h2>How to use</h2>
         <ul>
           <li>Scroll to zoom horizontally, or pinch on touch devices.</li>
-          <li>Drag the chart to pan through time.</li>
-          <li>Hover event bubbles to view key event notes.</li>
+          <li>Drag the chart to pan through time, or use the timeline scroll bar.</li>
+          <li>Hover event/note bubbles to view annotation text, and click a bubble when it contains a URL.</li>
         </ul>
       </section>
     </main>

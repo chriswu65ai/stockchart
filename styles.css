@@ -102,3 +102,30 @@ button:disabled {
   padding-left: 1rem;
   color: var(--muted);
 }
+
+
+.scroll-label {
+  display: block;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+#chart-scroll {
+  width: 100%;
+}
+
+
+.toggle-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.toggle-control input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+}
