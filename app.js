@@ -82,6 +82,26 @@ const parseDate = (value) => {
     return new Date(parsed.y, parsed.m - 1, parsed.d);
   }
 
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const isoMatch = trimmed.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+    if (isoMatch) {
+      const [, y, m, d] = isoMatch;
+      const dt = new Date(Number(y), Number(m) - 1, Number(d));
+      if (!Number.isNaN(dt.getTime())) return dt;
+    }
+
+    const dmyMatch = trimmed.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/);
+    if (dmyMatch) {
+      let [, d, m, y] = dmyMatch;
+      const year = y.length === 2 ? Number(`20${y}`) : Number(y);
+      const dt = new Date(year, Number(m) - 1, Number(d));
+      if (!Number.isNaN(dt.getTime())) return dt;
+    }
+  }
+
   const parsedDate = new Date(value);
   return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
