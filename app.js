@@ -51,6 +51,23 @@ const extractHttpUrl = (text) => {
   return '';
 };
 
+const areLinksDisabled = () => Boolean(disableLinksToggle?.checked);
+
+const syncBubbleLinks = (chartInstance) => {
+  if (!chartInstance) return;
+
+  chartInstance.data.datasets.forEach((dataset) => {
+    if (dataset?.type !== 'bubble' || !Array.isArray(dataset.data)) return;
+
+    dataset.data.forEach((point) => {
+      if (!point || typeof point !== 'object') return;
+      const originalLink = point.rawLink ?? point.link ?? '';
+      point.rawLink = originalLink;
+      point.link = areLinksDisabled() ? '' : originalLink;
+    });
+  });
+};
+
 const normalize = (text) => String(text ?? '').trim().toLowerCase();
 const getFirstMatchingKey = (headers, candidates) =>
   headers.find((header) => candidates.includes(normalize(header)));
@@ -161,7 +178,7 @@ const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) =
       type: 'bar',
       backgroundColor: `${color}cc`,
       borderWidth: 1,
-      barPercentage: 0.9,
+      barPercentage: 5.0,
       categoryPercentage: 0.9,
       maxBarThickness: 64
     };
@@ -245,6 +262,15 @@ const applyWindowToChart = () => {
   chart.options.scales.x.max = nextMax;
   chart.update('none');
   renderTimelineWindow();
+};
+
+const getCurrentWindowBounds = () => {
+  if (!chart || !chart.scales?.x) return null;
+
+  const { min, max } = chart.scales.x;
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
+
+  return { min, max };
 };
 
 const clearChart = () => {
@@ -360,6 +386,24 @@ const buildChart = (rows, columns) => {
   const eventPoints = points.filter((point) => point.event);
   const commentPoints = points.filter((point) => point.comment);
 
+  const nextFullMinX = points[0].x.getTime();
+  const nextFullMaxX = points[points.length - 1].x.getTime();
+  let preservedMinX = null;
+  let preservedMaxX = null;
+
+  if (columns.preserveWindow) {
+    const preservedSpan = columns.preserveWindow.max - columns.preserveWindow.min;
+    if (preservedSpan > 0) {
+      preservedMinX = Math.max(nextFullMinX, columns.preserveWindow.min);
+      preservedMaxX = Math.min(nextFullMaxX, columns.preserveWindow.max);
+
+      if (preservedMaxX <= preservedMinX) {
+        preservedMinX = null;
+        preservedMaxX = null;
+      }
+    }
+  }
+
   chartSource = {
     seriesADataset: makeSeriesDataset({
       label: seriesAKey,
@@ -390,6 +434,7 @@ const buildChart = (rows, columns) => {
               y: point.seriesA,
               r: 7,
               annotation: point.event,
+              rawLink: point.eventLink,
               link: point.eventLink
             })),
             backgroundColor: '#f59e0b',
@@ -408,6 +453,7 @@ const buildChart = (rows, columns) => {
               y: point.seriesA,
               r: 7,
               annotation: point.comment,
+              rawLink: point.commentLink,
               link: point.commentLink
             })),
             backgroundColor: '#22c55e',
@@ -438,7 +484,7 @@ const buildChart = (rows, columns) => {
           return ds?.type === 'bubble';
         });
 
-        if (!bubbleHit || disableLinksToggle.checked) return;
+        if (!bubbleHit || areLinksDisabled()) return;
 
         const dataset = chartInstance.data.datasets[bubbleHit.datasetIndex];
         const target = dataset?.data?.[bubbleHit.index];
@@ -462,7 +508,9 @@ const buildChart = (rows, columns) => {
         x: {
           type: 'time',
           time: { unit: 'month' },
-          title: { display: true, text: dateKey }
+          title: { display: true, text: dateKey },
+          min: preservedMinX,
+          max: preservedMaxX
         },
         y: {
           position: 'left',
@@ -530,8 +578,10 @@ const buildChart = (rows, columns) => {
     }
   });
 
-  fullMinX = points[0].x.getTime();
-  fullMaxX = points[points.length - 1].x.getTime();
+  fullMinX = nextFullMinX;
+  fullMaxX = nextFullMaxX;
+  syncBubbleLinks(chart);
+  if (chart) chart.update('none');
   syncWindowFromChart();
 
   resetZoomButton.disabled = false;
@@ -609,6 +659,8 @@ const renderSelectedSeries = () => {
     seriesFormats[seriesBKey] = detectSeriesFormat(worksheet, headers, seriesBKey, rowCount);
   }
 
+  const preserveWindow = getCurrentWindowBounds();
+
   buildChart(currentSheetContext.rows, {
     dateKey: currentSheetContext.dateKey,
     eventKey: currentSheetContext.eventKey,
@@ -619,7 +671,8 @@ const renderSelectedSeries = () => {
     seriesBKey: seriesBKey || null,
     seriesAStyle: seriesABarToggle.checked ? 'bar' : 'line',
     seriesBStyle: seriesBBarToggle.checked ? 'bar' : 'line',
-    seriesFormats
+    seriesFormats,
+    preserveWindow
   });
 };
 
@@ -748,6 +801,8 @@ seriesBBarToggle.addEventListener('change', () => {
 showEventToggle.addEventListener('change', refreshAnnotationDatasets);
 showCommentToggle.addEventListener('change', refreshAnnotationDatasets);
 disableLinksToggle.addEventListener('change', () => {
+  syncBubbleLinks(chart);
+  if (chart) chart.update('none');
   canvas.style.cursor = 'default';
 });
 
