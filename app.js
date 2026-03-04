@@ -7,12 +7,14 @@ const seriesBBarToggle = document.getElementById('series-b-bar');
 const resetZoomButton = document.getElementById('reset-zoom');
 const showEventToggle = document.getElementById('show-event-annotations');
 const showCommentToggle = document.getElementById('show-comment-annotations');
+const disableLinksToggle = document.getElementById('disable-links');
 const statusText = document.getElementById('status');
 const canvas = document.getElementById('share-chart');
 const timelineWindow = document.getElementById('timeline-window');
 const timelineSelection = document.getElementById('timeline-selection');
 const timelineHandleLeft = document.getElementById('timeline-handle-left');
 const timelineHandleRight = document.getElementById('timeline-handle-right');
+const quickTimeframeButtons = Array.from(document.querySelectorAll('.quick-timeframe-btn[data-years]'));
 
 let workbook = null;
 let chart = null;
@@ -34,7 +36,7 @@ const COMMENT_KEYS = ['comment', 'comments', 'note', 'notes'];
 const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
 const MIN_WINDOW_PCT = 2;
 const SERIES_A_COLOR = '#023047';
-const SERIES_B_COLOR = '#22C4DD';
+const SERIES_B_COLOR = '#ff5252';
 
 const extractHttpUrl = (text) => {
   const match = String(text ?? '').match(URL_PATTERN);
@@ -50,6 +52,23 @@ const extractHttpUrl = (text) => {
   return '';
 };
 
+const areLinksDisabled = () => Boolean(disableLinksToggle?.checked);
+
+const syncBubbleLinks = (chartInstance) => {
+  if (!chartInstance) return;
+
+  chartInstance.data.datasets.forEach((dataset) => {
+    if (dataset?.type !== 'bubble' || !Array.isArray(dataset.data)) return;
+
+    dataset.data.forEach((point) => {
+      if (!point || typeof point !== 'object') return;
+      const originalLink = point.rawLink ?? point.link ?? '';
+      point.rawLink = originalLink;
+      point.link = areLinksDisabled() ? '' : originalLink;
+    });
+  });
+};
+
 const normalize = (text) => String(text ?? '').trim().toLowerCase();
 const getFirstMatchingKey = (headers, candidates) =>
   headers.find((header) => candidates.includes(normalize(header)));
@@ -61,6 +80,26 @@ const parseDate = (value) => {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (!parsed) return null;
     return new Date(parsed.y, parsed.m - 1, parsed.d);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const isoMatch = trimmed.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+    if (isoMatch) {
+      const [, y, m, d] = isoMatch;
+      const dt = new Date(Number(y), Number(m) - 1, Number(d));
+      if (!Number.isNaN(dt.getTime())) return dt;
+    }
+
+    const dmyMatch = trimmed.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/);
+    if (dmyMatch) {
+      let [, d, m, y] = dmyMatch;
+      const year = y.length === 2 ? Number(`20${y}`) : Number(y);
+      const dt = new Date(year, Number(m) - 1, Number(d));
+      if (!Number.isNaN(dt.getTime())) return dt;
+    }
   }
 
   const parsedDate = new Date(value);
@@ -160,7 +199,7 @@ const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) =
       type: 'bar',
       backgroundColor: `${color}cc`,
       borderWidth: 1,
-      barPercentage: 1.0,
+      barPercentage: 6.0,
       categoryPercentage: 0.9,
       maxBarThickness: 64
     };
@@ -246,6 +285,33 @@ const applyWindowToChart = () => {
   renderTimelineWindow();
 };
 
+const setQuickTimeframeButtonsDisabled = (disabled) => {
+  quickTimeframeButtons.forEach((button) => {
+    button.disabled = disabled;
+  });
+};
+
+const applyLatestYearsWindow = (years) => {
+  if (!chart || fullMinX === null || fullMaxX === null || !Number.isFinite(years) || years <= 0) return;
+
+  const maxDate = new Date(fullMaxX);
+  const minDate = new Date(maxDate);
+  minDate.setFullYear(maxDate.getFullYear() - years);
+
+  const targetMin = Math.max(fullMinX, minDate.getTime());
+  chart.options.scales.x.min = targetMin;
+  chart.options.scales.x.max = fullMaxX;
+  chart.update('none');
+  syncWindowFromChart();
+};
+
+const getCurrentTimelineWindow = () => {
+  if (!isTimelineReady) return null;
+  if (!Number.isFinite(windowStartPct) || !Number.isFinite(windowSizePct)) return null;
+
+  return { start: windowStartPct, size: windowSizePct };
+};
+
 const clearChart = () => {
   if (chart) {
     chart.destroy();
@@ -258,6 +324,7 @@ const clearChart = () => {
   fullMaxX = null;
   viewSpan = null;
   resetZoomButton.disabled = true;
+  setQuickTimeframeButtonsDisabled(true);
   resetTimelineWindow();
 };
 
@@ -359,6 +426,9 @@ const buildChart = (rows, columns) => {
   const eventPoints = points.filter((point) => point.event);
   const commentPoints = points.filter((point) => point.comment);
 
+  const nextFullMinX = points[0].x.getTime();
+  const nextFullMaxX = points[points.length - 1].x.getTime();
+
   chartSource = {
     seriesADataset: makeSeriesDataset({
       label: seriesAKey,
@@ -389,6 +459,7 @@ const buildChart = (rows, columns) => {
               y: point.seriesA,
               r: 7,
               annotation: point.event,
+              rawLink: point.eventLink,
               link: point.eventLink
             })),
             backgroundColor: '#f59e0b',
@@ -407,6 +478,7 @@ const buildChart = (rows, columns) => {
               y: point.seriesA,
               r: 7,
               annotation: point.comment,
+              rawLink: point.commentLink,
               link: point.commentLink
             })),
             backgroundColor: '#22c55e',
@@ -437,7 +509,7 @@ const buildChart = (rows, columns) => {
           return ds?.type === 'bubble';
         });
 
-        if (!bubbleHit) return;
+        if (!bubbleHit || areLinksDisabled()) return;
 
         const dataset = chartInstance.data.datasets[bubbleHit.datasetIndex];
         const target = dataset?.data?.[bubbleHit.index];
@@ -454,7 +526,8 @@ const buildChart = (rows, columns) => {
         const { datasetIndex, index } = activeElements[0];
         const dataset = chartInstance.data.datasets[datasetIndex];
         const target = dataset?.data?.[index];
-        canvas.style.cursor = dataset?.type === 'bubble' && target?.link ? 'pointer' : 'default';
+        canvas.style.cursor =
+          dataset?.type === 'bubble' && target?.link && !disableLinksToggle.checked ? 'pointer' : 'default';
       },
       scales: {
         x: {
@@ -528,11 +601,25 @@ const buildChart = (rows, columns) => {
     }
   });
 
-  fullMinX = points[0].x.getTime();
-  fullMaxX = points[points.length - 1].x.getTime();
-  syncWindowFromChart();
+  fullMinX = nextFullMinX;
+  fullMaxX = nextFullMaxX;
+  syncBubbleLinks(chart);
+
+  const preservedTimeline = columns.preserveTimeline;
+  if (preservedTimeline && Number.isFinite(preservedTimeline.start) && Number.isFinite(preservedTimeline.size)) {
+    windowSizePct = Math.max(MIN_WINDOW_PCT, Math.min(100, preservedTimeline.size));
+    windowStartPct = Math.max(0, Math.min(100 - windowSizePct, preservedTimeline.start));
+    isTimelineReady = true;
+    timelineWindow.classList.remove('is-disabled');
+    applyWindowToChart();
+  } else {
+    syncWindowFromChart();
+  }
+
+  if (chart) chart.update('none');
 
   resetZoomButton.disabled = false;
+  setQuickTimeframeButtonsDisabled(false);
   updateStatus(
     `Rendered ${points.length} points (${seriesAKey}${seriesBKey ? ` + ${seriesBKey}` : ''}) with ${eventPoints.length} events and ${commentPoints.length} comments.`
   );
@@ -580,7 +667,7 @@ const populateSeriesSelectors = () => {
   syncSeriesSelectorOptions();
 };
 
-const renderSelectedSeries = () => {
+const renderSelectedSeries = ({ preserveTimeline = true } = {}) => {
   if (!currentSheetContext) return;
 
   const seriesAKey = seriesASelect.value;
@@ -607,6 +694,8 @@ const renderSelectedSeries = () => {
     seriesFormats[seriesBKey] = detectSeriesFormat(worksheet, headers, seriesBKey, rowCount);
   }
 
+  const preservedTimelineWindow = preserveTimeline ? getCurrentTimelineWindow() : null;
+
   buildChart(currentSheetContext.rows, {
     dateKey: currentSheetContext.dateKey,
     eventKey: currentSheetContext.eventKey,
@@ -617,7 +706,8 @@ const renderSelectedSeries = () => {
     seriesBKey: seriesBKey || null,
     seriesAStyle: seriesABarToggle.checked ? 'bar' : 'line',
     seriesBStyle: seriesBBarToggle.checked ? 'bar' : 'line',
-    seriesFormats
+    seriesFormats,
+    preserveTimeline: preservedTimelineWindow
   });
 };
 
@@ -668,7 +758,7 @@ const parseSheet = (sheetName) => {
     return;
   }
 
-  renderSelectedSeries();
+  renderSelectedSeries({ preserveTimeline: false });
 };
 
 fileInput.addEventListener('change', async (event) => {
@@ -703,8 +793,15 @@ fileInput.addEventListener('change', async (event) => {
     }
 
     sheetSelect.disabled = false;
-    sheetSelect.value = '';
-    updateStatus(`Loaded ${file.name}. Select a sheet, then choose Series A/Series B.`);
+    const [firstSheet] = workbook.SheetNames;
+    sheetSelect.value = firstSheet || '';
+
+    if (firstSheet) {
+      parseSheet(firstSheet);
+      updateStatus(`Loaded ${file.name}. Showing ${firstSheet}. You can change Sheet/Series selections anytime.`);
+    } else {
+      updateStatus(`Loaded ${file.name}. Select a sheet, then choose Series A/Series B.`);
+    }
   } catch (error) {
     workbook = null;
     sheetSelect.disabled = true;
@@ -745,6 +842,11 @@ seriesBBarToggle.addEventListener('change', () => {
 
 showEventToggle.addEventListener('change', refreshAnnotationDatasets);
 showCommentToggle.addEventListener('change', refreshAnnotationDatasets);
+disableLinksToggle.addEventListener('change', () => {
+  syncBubbleLinks(chart);
+  if (chart) chart.update('none');
+  canvas.style.cursor = 'default';
+});
 
 const triggerResetZoom = (event) => {
   if (event) event.preventDefault();
@@ -769,6 +871,13 @@ const triggerResetZoom = (event) => {
 
 resetZoomButton.addEventListener('click', triggerResetZoom);
 resetZoomButton.addEventListener('touchend', triggerResetZoom, { passive: false });
+
+quickTimeframeButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const years = Number(button.dataset.years);
+    applyLatestYearsWindow(years);
+  });
+});
 
 const setupTimelineInteractions = () => {
   let dragMode = null;
