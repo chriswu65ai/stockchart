@@ -24,6 +24,7 @@ let currentSheetContext = null;
 
 let fullMinX = null;
 let fullMaxX = null;
+let latestSeriesAMaxX = null;
 let viewSpan = null;
 
 let windowStartPct = 0;
@@ -136,12 +137,28 @@ const parseNumeric = (value) => {
   return Number(value);
 };
 
+const extractHyperlinkFromFormula = (formula) => {
+  if (typeof formula !== 'string') return '';
+
+  const match = formula.match(/^\s*=\s*HYPERLINK\s*\(\s*"((?:""|[^"])*)"/i);
+  if (!match) return '';
+
+  const url = match[1].replace(/""/g, '"').trim();
+  return extractHttpUrl(url);
+};
+
 const getWorksheetCellHyperlink = (worksheet, rowIndex, colIndex) => {
   if (colIndex < 0) return '';
   const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
   const cell = worksheet[cellAddress];
+
   const target = cell?.l?.Target || cell?.l?.target;
-  return target ? String(target) : '';
+  if (target) return extractHttpUrl(target);
+
+  const formulaLink = extractHyperlinkFromFormula(cell?.f);
+  if (formulaLink) return formulaLink;
+
+  return '';
 };
 
 const formatDateOnly = (value) =>
@@ -208,13 +225,14 @@ const wrapByPixelWidth = (text, chartInstance, maxWidthPx) => {
   return lines;
 };
 
-const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) => {
+const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style, order }) => {
   const common = {
     label,
     seriesKey,
     yAxisID: axisId,
     data: points,
-    borderColor: color
+    borderColor: color,
+    order
   };
 
   if (style === 'bar') {
@@ -223,8 +241,8 @@ const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) =
       type: 'bar',
       backgroundColor: `${color}cc`,
       borderWidth: 1,
-      barPercentage: 6.0,
-      categoryPercentage: 0.9,
+      barPercentage: 0.9,
+      categoryPercentage: 0.8,
       maxBarThickness: 64
     };
   }
@@ -323,7 +341,8 @@ const setQuickTimeframeButtonsDisabled = (disabled) => {
 const applyLatestYearsWindow = (years) => {
   if (!chart || fullMinX === null || fullMaxX === null || !Number.isFinite(years) || years <= 0) return;
 
-  const maxDate = new Date(fullMaxX);
+  const anchorMaxX = Number.isFinite(latestSeriesAMaxX) ? latestSeriesAMaxX : fullMaxX;
+  const maxDate = new Date(anchorMaxX);
   const minDate = new Date(maxDate);
   minDate.setFullYear(maxDate.getFullYear() - years);
 
@@ -351,6 +370,7 @@ const clearChart = () => {
   currentMeta = null;
   fullMinX = null;
   fullMaxX = null;
+  latestSeriesAMaxX = null;
   viewSpan = null;
   resetZoomButton.disabled = true;
   setQuickTimeframeButtonsDisabled(true);
@@ -420,7 +440,11 @@ const buildChart = (rows, columns) => {
       const seriesAValue = parseNumeric(row[seriesAKey]);
       const seriesBValue = seriesBKey ? parseNumeric(row[seriesBKey]) : NaN;
 
-      if (!date || Number.isNaN(seriesAValue)) return null;
+      if (!date) return null;
+
+      const normalizedSeriesA = Number.isNaN(seriesAValue) ? null : seriesAValue;
+      const normalizedSeriesB = Number.isNaN(seriesBValue) ? null : seriesBValue;
+      if (normalizedSeriesA === null && normalizedSeriesB === null) return null;
 
       const event = eventKey && row[eventKey] ? String(row[eventKey]).trim() : '';
       const comment = commentKey && row[commentKey] ? String(row[commentKey]).trim() : '';
@@ -436,8 +460,8 @@ const buildChart = (rows, columns) => {
 
       return {
         x: date,
-        seriesA: seriesAValue,
-        seriesB: Number.isNaN(seriesBValue) ? null : seriesBValue,
+        seriesA: normalizedSeriesA,
+        seriesB: normalizedSeriesB,
         event,
         comment,
         eventLink: eventCellLink || extractHttpUrl(event),
@@ -452,20 +476,37 @@ const buildChart = (rows, columns) => {
     return;
   }
 
-  const eventPoints = points.filter((point) => point.event);
-  const commentPoints = points.filter((point) => point.comment);
+  const seriesAPoints = points.filter((point) => point.seriesA !== null);
+  if (!seriesAPoints.length) {
+    updateStatus('Series A has no valid data points for the selected columns.', true);
+    return;
+  }
+
+  const eventPoints = points.filter((point) => point.event && point.seriesA !== null);
+  const commentPoints = points.filter((point) => point.comment && point.seriesA !== null);
+
+  const latestDateInFile = rows.reduce((latest, row) => {
+    const rowDate = parseDate(row[dateKey]);
+    if (!rowDate) return latest;
+    const rowTime = rowDate.getTime();
+    return Math.max(latest, rowTime);
+  }, Number.NEGATIVE_INFINITY);
 
   const nextFullMinX = points[0].x.getTime();
-  const nextFullMaxX = points[points.length - 1].x.getTime();
+  const nextSeriesAMaxX = seriesAPoints[seriesAPoints.length - 1].x.getTime();
+  const nextFullMaxX = Number.isFinite(latestDateInFile)
+    ? latestDateInFile
+    : nextSeriesAMaxX;
 
   chartSource = {
     seriesADataset: makeSeriesDataset({
       label: seriesAKey,
       seriesKey: seriesAKey,
       axisId: 'y',
-      points: points.map((point) => ({ x: point.x, y: point.seriesA })),
+      points: seriesAPoints.map((point) => ({ x: point.x, y: point.seriesA })),
       color: SERIES_A_COLOR,
-      style: seriesAStyle
+      style: seriesAStyle,
+      order: 2
     }),
     seriesBDataset:
       seriesBKey && points.some((point) => point.seriesB !== null)
@@ -475,7 +516,8 @@ const buildChart = (rows, columns) => {
             axisId: 'y1',
             points: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB })),
             color: SERIES_B_COLOR,
-            style: seriesBStyle
+            style: seriesBStyle,
+            order: 3
           })
         : null,
     eventDataset:
@@ -494,7 +536,8 @@ const buildChart = (rows, columns) => {
             backgroundColor: '#f59e0b',
             borderColor: '#b45309',
             borderWidth: 1,
-            hoverBackgroundColor: '#f97316'
+            hoverBackgroundColor: '#f97316',
+            order: 1
           }
         : null,
     commentDataset:
@@ -513,7 +556,8 @@ const buildChart = (rows, columns) => {
             backgroundColor: '#22c55e',
             borderColor: '#15803d',
             borderWidth: 1,
-            hoverBackgroundColor: '#16a34a'
+            hoverBackgroundColor: '#16a34a',
+            order: 1
           }
         : null
   };
@@ -563,8 +607,8 @@ const buildChart = (rows, columns) => {
           type: 'time',
           time: { unit: 'month' },
           title: { display: true, text: dateKey },
-          min: preservedMinX,
-          max: preservedMaxX
+          min: nextFullMinX,
+          max: nextFullMaxX
         },
         y: {
           position: 'left',
@@ -634,6 +678,7 @@ const buildChart = (rows, columns) => {
 
   fullMinX = nextFullMinX;
   fullMaxX = nextFullMaxX;
+  latestSeriesAMaxX = nextSeriesAMaxX;
   preservedMinX = nextFullMinX;
   preservedMaxX = nextFullMaxX;
   syncBubbleLinks(chart);
