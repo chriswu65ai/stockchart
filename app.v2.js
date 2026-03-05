@@ -243,15 +243,10 @@ const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) =
 const buildVisibleDatasets = () => {
   if (!chartSource) return [];
 
-  const datasets = [];
-
-  // Draw order (bottom -> top): Series B, Series A, annotations.
-  // This keeps markers visible above both line/bar series.
+  const datasets = [chartSource.seriesADataset];
   if (chartSource.seriesBDataset) datasets.push(chartSource.seriesBDataset);
-  datasets.push(chartSource.seriesADataset);
   if (chartSource.eventDataset && showEventToggle.checked) datasets.push(chartSource.eventDataset);
   if (chartSource.commentDataset && showCommentToggle.checked) datasets.push(chartSource.commentDataset);
-
   return datasets;
 };
 
@@ -562,9 +557,7 @@ const buildChart = (rows, columns) => {
         x: {
           type: 'time',
           time: { unit: 'month' },
-          title: { display: true, text: dateKey },
-          min: preservedMinX,
-          max: preservedMaxX
+          title: { display: true, text: dateKey }
         },
         y: {
           position: 'left',
