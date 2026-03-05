@@ -456,8 +456,17 @@ const buildChart = (rows, columns) => {
   const eventPoints = points.filter((point) => point.event);
   const commentPoints = points.filter((point) => point.comment);
 
+  const latestDateInFile = rows.reduce((latest, row) => {
+    const rowDate = parseDate(row[dateKey]);
+    if (!rowDate) return latest;
+    const rowTime = rowDate.getTime();
+    return Math.max(latest, rowTime);
+  }, Number.NEGATIVE_INFINITY);
+
   const nextFullMinX = points[0].x.getTime();
-  const nextFullMaxX = points[points.length - 1].x.getTime();
+  const nextFullMaxX = Number.isFinite(latestDateInFile)
+    ? latestDateInFile
+    : points[points.length - 1].x.getTime();
 
   chartSource = {
     seriesADataset: makeSeriesDataset({
