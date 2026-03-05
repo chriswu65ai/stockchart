@@ -41,7 +41,7 @@ const COMMENT_KEYS = ['comment', 'comments', 'note', 'notes'];
 const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
 const MIN_WINDOW_PCT = 2;
 const SERIES_A_COLOR = '#023047';
-const SERIES_B_COLOR = '#a90000';
+const SERIES_B_COLOR = '#22C4DD';
 
 const extractHttpUrl = (text) => {
   const match = String(text ?? '').match(URL_PATTERN);
