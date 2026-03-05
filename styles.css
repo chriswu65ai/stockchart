@@ -37,6 +37,7 @@ header,
 .controls,
 .status-panel,
 .chart-panel,
+.advanced-section,
 .tips {
   background: var(--card);
   border: 1px solid var(--border);
@@ -218,6 +219,10 @@ button:disabled {
   .controls {
     grid-template-columns: 1fr;
   }
+
+  .advanced-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 body.is-timeline-dragging {
@@ -261,4 +266,48 @@ body.is-timeline-dragging {
   min-width: 3.25rem;
   padding: 0.35rem 0.7rem;
   line-height: 1.1;
+}
+
+
+.advanced-panel {
+  padding: 0.15rem 0.15rem 0.35rem;
+}
+
+.advanced-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+
+.advanced-grid {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, 15%);
+  justify-content: start;
+  gap: 0.85rem;
+}
+
+.axis-controls {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.axis-controls h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.axis-controls.is-disabled {
+  opacity: 0.55;
+}
+
+.axis-reset-btn {
+  width: auto;
+  justify-self: start;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
 }

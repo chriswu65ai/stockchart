@@ -15,6 +15,14 @@ const timelineSelection = document.getElementById('timeline-selection');
 const timelineHandleLeft = document.getElementById('timeline-handle-left');
 const timelineHandleRight = document.getElementById('timeline-handle-right');
 const quickTimeframeButtons = Array.from(document.querySelectorAll('.quick-timeframe-btn[data-years]'));
+const seriesAAxisControls = document.getElementById('series-a-axis-controls');
+const seriesBAxisControls = document.getElementById('series-b-axis-controls');
+const seriesAMaxInput = document.getElementById('series-a-max');
+const seriesAMinInput = document.getElementById('series-a-min');
+const seriesAResetButton = document.getElementById('series-a-reset');
+const seriesBMaxInput = document.getElementById('series-b-max');
+const seriesBMinInput = document.getElementById('series-b-min');
+const seriesBResetButton = document.getElementById('series-b-reset');
 
 let workbook = null;
 let chart = null;
@@ -26,6 +34,15 @@ let fullMinX = null;
 let fullMaxX = null;
 let latestSeriesAMaxX = null;
 let viewSpan = null;
+
+let axisDefaults = {
+  y: { min: null, max: null },
+  y1: { min: null, max: null }
+};
+let axisOverrides = {
+  y: { min: null, max: null },
+  y1: { min: null, max: null }
+};
 
 let windowStartPct = 0;
 let windowSizePct = 100;
@@ -371,6 +388,67 @@ const getCurrentTimelineWindow = () => {
   return { start: windowStartPct, size: windowSizePct };
 };
 
+const readAxisInputValue = (input) => {
+  const raw = input.value.trim();
+  if (!raw) return null;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatAxisInputValue = (value) => (Number.isFinite(value) ? String(value) : '');
+
+const updateAxisControlsUI = () => {
+  const hasChart = Boolean(chart);
+  const hasSeriesB = Boolean(chartSource?.seriesBDataset);
+
+  seriesAAxisControls.classList.toggle('is-disabled', !hasChart);
+  seriesBAxisControls.classList.toggle('is-disabled', !hasChart || !hasSeriesB);
+
+  seriesAMaxInput.disabled = !hasChart;
+  seriesAMinInput.disabled = !hasChart;
+  seriesAResetButton.disabled = !hasChart;
+
+  seriesBMaxInput.disabled = !hasChart || !hasSeriesB;
+  seriesBMinInput.disabled = !hasChart || !hasSeriesB;
+  seriesBResetButton.disabled = !hasChart || !hasSeriesB;
+
+  seriesAMaxInput.value = formatAxisInputValue(axisOverrides.y.max);
+  seriesAMinInput.value = formatAxisInputValue(axisOverrides.y.min);
+
+  seriesBMaxInput.value = formatAxisInputValue(axisOverrides.y1.max);
+  seriesBMinInput.value = formatAxisInputValue(axisOverrides.y1.min);
+};
+
+const applyAxisOverrides = () => {
+  if (!chart) return;
+
+  const scales = chart.options.scales;
+  const yMin = axisOverrides.y.min;
+  const yMax = axisOverrides.y.max;
+  const y1Min = axisOverrides.y1.min;
+  const y1Max = axisOverrides.y1.max;
+
+  scales.y.min = Number.isFinite(yMin) ? yMin : axisDefaults.y.min;
+  scales.y.max = Number.isFinite(yMax) ? yMax : axisDefaults.y.max;
+  scales.y1.min = Number.isFinite(y1Min) ? y1Min : axisDefaults.y1.min;
+  scales.y1.max = Number.isFinite(y1Max) ? y1Max : axisDefaults.y1.max;
+
+  chart.update();
+};
+
+const setAxisOverride = (axisId, bound, value) => {
+  axisOverrides[axisId][bound] = value;
+  applyAxisOverrides();
+};
+
+const resetAxisOverride = (axisId) => {
+  axisOverrides[axisId].min = null;
+  axisOverrides[axisId].max = null;
+  applyAxisOverrides();
+  updateAxisControlsUI();
+};
+
 const clearChart = () => {
   if (chart) {
     chart.destroy();
@@ -383,9 +461,12 @@ const clearChart = () => {
   fullMaxX = null;
   latestSeriesAMaxX = null;
   viewSpan = null;
+  axisDefaults = { y: { min: null, max: null }, y1: { min: null, max: null } };
+  axisOverrides = { y: { min: null, max: null }, y1: { min: null, max: null } };
   resetZoomButton.disabled = true;
   setQuickTimeframeButtonsDisabled(true);
   resetTimelineWindow();
+  updateAxisControlsUI();
 };
 
 const resetSeriesSelectors = () => {
@@ -708,6 +789,13 @@ const buildChart = (rows, columns) => {
   if (chart) {
     chart.clear();
     chart.update();
+
+    axisDefaults = {
+      y: { min: chart.scales.y.min, max: chart.scales.y.max },
+      y1: { min: chart.scales.y1?.min ?? null, max: chart.scales.y1?.max ?? null }
+    };
+    axisOverrides = { y: { min: null, max: null }, y1: { min: null, max: null } };
+    updateAxisControlsUI();
   }
 
   resetZoomButton.disabled = false;
@@ -975,6 +1063,36 @@ quickTimeframeButtons.forEach((button) => {
   });
 });
 
+seriesAMaxInput.addEventListener('input', () => {
+  if (!chart) return;
+  setAxisOverride('y', 'max', readAxisInputValue(seriesAMaxInput));
+});
+
+seriesAMinInput.addEventListener('input', () => {
+  if (!chart) return;
+  setAxisOverride('y', 'min', readAxisInputValue(seriesAMinInput));
+});
+
+seriesBMaxInput.addEventListener('input', () => {
+  if (!chart || !chartSource?.seriesBDataset) return;
+  setAxisOverride('y1', 'max', readAxisInputValue(seriesBMaxInput));
+});
+
+seriesBMinInput.addEventListener('input', () => {
+  if (!chart || !chartSource?.seriesBDataset) return;
+  setAxisOverride('y1', 'min', readAxisInputValue(seriesBMinInput));
+});
+
+seriesAResetButton.addEventListener('click', () => {
+  if (!chart) return;
+  resetAxisOverride('y');
+});
+
+seriesBResetButton.addEventListener('click', () => {
+  if (!chart || !chartSource?.seriesBDataset) return;
+  resetAxisOverride('y1');
+});
+
 const setupTimelineInteractions = () => {
   let dragMode = null;
   let startX = 0;
@@ -1051,4 +1169,5 @@ const setupTimelineInteractions = () => {
 };
 
 resetSeriesSelectors();
+updateAxisControlsUI();
 setupTimelineInteractions();
