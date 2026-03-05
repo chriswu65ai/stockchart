@@ -492,13 +492,6 @@ const buildChart = (rows, columns) => {
     return Math.max(latest, rowTime);
   }, Number.NEGATIVE_INFINITY);
 
-  const latestDateInFile = rows.reduce((latest, row) => {
-    const rowDate = parseDate(row[dateKey]);
-    if (!rowDate) return latest;
-    const rowTime = rowDate.getTime();
-    return Math.max(latest, rowTime);
-  }, Number.NEGATIVE_INFINITY);
-
   const nextFullMinX = points[0].x.getTime();
   const nextSeriesAMaxX = seriesAPoints[seriesAPoints.length - 1].x.getTime();
   const nextFullMaxX = Number.isFinite(latestDateInFile)
