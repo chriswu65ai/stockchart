@@ -44,7 +44,28 @@ const MIN_WINDOW_PCT = 2;
 const SERIES_A_COLOR = '#023047';
 const SERIES_B_COLOR = '#22C4DD';
 
+const extractHyperlinkFromFormula = (formula) => {
+  if (typeof formula !== 'string') return '';
+
+  const match = formula.match(/^\s*=\s*HYPERLINK\s*\(\s*"((?:""|[^"])*)"/i);
+  if (!match) return '';
+
+  const url = match[1].replace(/""/g, '"').trim();
+
+  try {
+    const candidate = new URL(url);
+    if (candidate.protocol === 'http:' || candidate.protocol === 'https:') return candidate.href;
+  } catch (_error) {
+    return '';
+  }
+
+  return '';
+};
+
 const extractHttpUrl = (text) => {
+  const formulaUrl = extractHyperlinkFromFormula(text);
+  if (formulaUrl) return formulaUrl;
+
   const match = String(text ?? '').match(URL_PATTERN);
   if (!match) return '';
 
@@ -135,16 +156,6 @@ const parseNumeric = (value) => {
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() === '') return NaN;
   return Number(value);
-};
-
-const extractHyperlinkFromFormula = (formula) => {
-  if (typeof formula !== 'string') return '';
-
-  const match = formula.match(/^\s*=\s*HYPERLINK\s*\(\s*"((?:""|[^"])*)"/i);
-  if (!match) return '';
-
-  const url = match[1].replace(/""/g, '"').trim();
-  return extractHttpUrl(url);
 };
 
 const getWorksheetCellHyperlink = (worksheet, rowIndex, colIndex) => {
