@@ -208,13 +208,14 @@ const wrapByPixelWidth = (text, chartInstance, maxWidthPx) => {
   return lines;
 };
 
-const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) => {
+const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style, order }) => {
   const common = {
     label,
     seriesKey,
     yAxisID: axisId,
     data: points,
-    borderColor: color
+    borderColor: color,
+    order
   };
 
   if (style === 'bar') {
@@ -465,7 +466,8 @@ const buildChart = (rows, columns) => {
       axisId: 'y',
       points: points.map((point) => ({ x: point.x, y: point.seriesA })),
       color: SERIES_A_COLOR,
-      style: seriesAStyle
+      style: seriesAStyle,
+      order: 2
     }),
     seriesBDataset:
       seriesBKey && points.some((point) => point.seriesB !== null)
@@ -475,7 +477,8 @@ const buildChart = (rows, columns) => {
             axisId: 'y1',
             points: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB })),
             color: SERIES_B_COLOR,
-            style: seriesBStyle
+            style: seriesBStyle,
+            order: 3
           })
         : null,
     eventDataset:
@@ -494,7 +497,8 @@ const buildChart = (rows, columns) => {
             backgroundColor: '#f59e0b',
             borderColor: '#b45309',
             borderWidth: 1,
-            hoverBackgroundColor: '#f97316'
+            hoverBackgroundColor: '#f97316',
+            order: 1
           }
         : null,
     commentDataset:
@@ -513,7 +517,8 @@ const buildChart = (rows, columns) => {
             backgroundColor: '#22c55e',
             borderColor: '#15803d',
             borderWidth: 1,
-            hoverBackgroundColor: '#16a34a'
+            hoverBackgroundColor: '#16a34a',
+            order: 1
           }
         : null
   };
