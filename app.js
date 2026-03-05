@@ -467,7 +467,7 @@ const buildChart = (rows, columns) => {
       points: points.map((point) => ({ x: point.x, y: point.seriesA })),
       color: SERIES_A_COLOR,
       style: seriesAStyle,
-      order: 2
+      order: 3
     }),
     seriesBDataset:
       seriesBKey && points.some((point) => point.seriesB !== null)
@@ -478,7 +478,7 @@ const buildChart = (rows, columns) => {
             points: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB })),
             color: SERIES_B_COLOR,
             style: seriesBStyle,
-            order: 3
+            order: 2
           })
         : null,
     eventDataset:
