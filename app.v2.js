@@ -360,7 +360,7 @@ const resetSeriesSelectors = () => {
   seriesASelect.innerHTML = '<option value="">Choose series A</option>';
   seriesBSelect.innerHTML = '<option value="">None</option>';
   seriesABarToggle.checked = false;
-  seriesBBarToggle.checked = false;
+  seriesBBarToggle.checked = true;
 };
 
 const syncSeriesSelectorOptions = () => {
@@ -692,7 +692,7 @@ const populateSeriesSelectors = () => {
   const defaultB = options.find((key) => key !== options[0]);
   seriesBSelect.value = defaultB || '';
   seriesABarToggle.checked = false;
-  seriesBBarToggle.checked = false;
+  seriesBBarToggle.checked = true;
   syncSeriesSelectorOptions();
 };
 
