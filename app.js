@@ -15,6 +15,20 @@ const timelineSelection = document.getElementById('timeline-selection');
 const timelineHandleLeft = document.getElementById('timeline-handle-left');
 const timelineHandleRight = document.getElementById('timeline-handle-right');
 const quickTimeframeButtons = Array.from(document.querySelectorAll('.quick-timeframe-btn[data-years]'));
+const seriesAAxisControls = document.getElementById('series-a-axis-controls');
+const seriesBAxisControls = document.getElementById('series-b-axis-controls');
+const seriesAMaxInput = document.getElementById('series-a-max');
+const seriesAMinInput = document.getElementById('series-a-min');
+const seriesAResetButton = document.getElementById('series-a-reset');
+const seriesBMaxInput = document.getElementById('series-b-max');
+const seriesBMinInput = document.getElementById('series-b-min');
+const seriesBResetButton = document.getElementById('series-b-reset');
+const seriesAInvertToggle = document.getElementById('series-a-invert');
+const seriesBInvertToggle = document.getElementById('series-b-invert');
+const seriesLeadLagControls = document.getElementById('series-leadlag-controls');
+const seriesALeadLagInput = document.getElementById('series-a-leadlag');
+const seriesBLeadLagInput = document.getElementById('series-b-leadlag');
+const seriesLeadLagResetButton = document.getElementById('series-leadlag-reset');
 
 let workbook = null;
 let chart = null;
@@ -26,6 +40,17 @@ let fullMinX = null;
 let fullMaxX = null;
 let latestSeriesAMaxX = null;
 let viewSpan = null;
+
+let axisDefaults = {
+  y: { min: null, max: null },
+  y1: { min: null, max: null }
+};
+let axisOverrides = {
+  y: { min: null, max: null },
+  y1: { min: null, max: null }
+};
+let axisInversions = { y: false, y1: false };
+let seriesLeadLagOffsets = { seriesA: 0, seriesB: 0 };
 
 let windowStartPct = 0;
 let windowSizePct = 100;
@@ -236,6 +261,68 @@ const wrapByPixelWidth = (text, chartInstance, maxWidthPx) => {
   return lines;
 };
 
+const formatLeadLagLabelSuffix = (offset) => {
+  if (!Number.isFinite(offset) || offset === 0) return '';
+  return ` (${offset > 0 ? `+${offset}` : offset})`;
+};
+
+const shiftSeriesPointsByDates = (points, offset, dateIndexLookup, datesByIndex) => {
+  if (!Array.isArray(points)) return [];
+  if (!Number.isFinite(offset) || offset === 0) return points;
+
+  return points
+    .map((point) => {
+      const index = dateIndexLookup.get(point.x.getTime());
+      if (!Number.isInteger(index)) return null;
+
+      const shiftedDate = datesByIndex[index + offset];
+      if (!shiftedDate) return null;
+
+      return { ...point, x: shiftedDate };
+    })
+    .filter(Boolean);
+};
+
+const rebuildShiftedSeriesDatasets = () => {
+  if (!chartSource) return;
+
+  const seriesAOffset = seriesLeadLagOffsets.seriesA;
+  const seriesBOffset = seriesLeadLagOffsets.seriesB;
+
+  chartSource.seriesADataset = makeSeriesDataset({
+    label: `${chartSource.seriesA.key}${formatLeadLagLabelSuffix(seriesAOffset)}`,
+    seriesKey: chartSource.seriesA.key,
+    axisId: 'y',
+    points: shiftSeriesPointsByDates(
+      chartSource.seriesA.points,
+      seriesAOffset,
+      chartSource.dateIndexLookup,
+      chartSource.datesByIndex
+    ),
+    color: SERIES_A_COLOR,
+    style: chartSource.seriesA.style,
+    order: 2
+  });
+
+  chartSource.seriesBDataset =
+    chartSource.seriesB
+      ? makeSeriesDataset({
+          label: `${chartSource.seriesB.key}${formatLeadLagLabelSuffix(seriesBOffset)}`,
+          seriesKey: chartSource.seriesB.key,
+          axisId: 'y1',
+          points: shiftSeriesPointsByDates(
+            chartSource.seriesB.points,
+            seriesBOffset,
+            chartSource.dateIndexLookup,
+            chartSource.datesByIndex
+          ),
+          color: SERIES_B_COLOR,
+          style: chartSource.seriesB.style,
+          order: 3
+        })
+      : null;
+};
+
 const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style, order }) => {
   const common = {
     label,
@@ -371,6 +458,99 @@ const getCurrentTimelineWindow = () => {
   return { start: windowStartPct, size: windowSizePct };
 };
 
+const readAxisInputValue = (input) => {
+  const raw = input.value.trim();
+  if (!raw) return null;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatAxisInputValue = (value) => (Number.isFinite(value) ? String(value) : '');
+
+const updateAxisControlsUI = () => {
+  const hasChart = Boolean(chart);
+  const hasSeriesB = Boolean(chartSource?.seriesB);
+
+  seriesAAxisControls.classList.toggle('is-disabled', !hasChart);
+  seriesBAxisControls.classList.toggle('is-disabled', !hasChart || !hasSeriesB);
+  seriesLeadLagControls.classList.toggle('is-disabled', !hasChart);
+
+  seriesAMaxInput.disabled = !hasChart;
+  seriesAMinInput.disabled = !hasChart;
+  seriesAResetButton.disabled = !hasChart;
+  seriesAInvertToggle.disabled = !hasChart;
+
+  seriesBMaxInput.disabled = !hasChart || !hasSeriesB;
+  seriesBMinInput.disabled = !hasChart || !hasSeriesB;
+  seriesBResetButton.disabled = !hasChart || !hasSeriesB;
+  seriesBInvertToggle.disabled = !hasChart || !hasSeriesB;
+
+  seriesALeadLagInput.disabled = !hasChart;
+  seriesBLeadLagInput.disabled = !hasChart || !hasSeriesB;
+  seriesLeadLagResetButton.disabled = !hasChart;
+
+  seriesAMaxInput.value = formatAxisInputValue(axisOverrides.y.max);
+  seriesAMinInput.value = formatAxisInputValue(axisOverrides.y.min);
+
+  seriesBMaxInput.value = formatAxisInputValue(axisOverrides.y1.max);
+  seriesBMinInput.value = formatAxisInputValue(axisOverrides.y1.min);
+
+  seriesAInvertToggle.checked = Boolean(axisInversions.y);
+  seriesBInvertToggle.checked = Boolean(axisInversions.y1);
+
+  seriesALeadLagInput.value = String(seriesLeadLagOffsets.seriesA || 0);
+  seriesBLeadLagInput.value = String(seriesLeadLagOffsets.seriesB || 0);
+};
+
+const applyAxisOverrides = () => {
+  if (!chart) return;
+
+  const scales = chart.options.scales;
+  const yMin = axisOverrides.y.min;
+  const yMax = axisOverrides.y.max;
+  const y1Min = axisOverrides.y1.min;
+  const y1Max = axisOverrides.y1.max;
+
+  scales.y.min = Number.isFinite(yMin) ? yMin : axisDefaults.y.min;
+  scales.y.max = Number.isFinite(yMax) ? yMax : axisDefaults.y.max;
+  scales.y1.min = Number.isFinite(y1Min) ? y1Min : axisDefaults.y1.min;
+  scales.y1.max = Number.isFinite(y1Max) ? y1Max : axisDefaults.y1.max;
+  scales.y.reverse = Boolean(axisInversions.y);
+  scales.y1.reverse = Boolean(axisInversions.y1);
+
+  chart.update();
+};
+
+const setAxisOverride = (axisId, bound, value) => {
+  axisOverrides[axisId][bound] = value;
+  applyAxisOverrides();
+};
+
+const resetAxisOverride = (axisId) => {
+  axisOverrides[axisId].min = null;
+  axisOverrides[axisId].max = null;
+  axisInversions[axisId] = false;
+  applyAxisOverrides();
+  updateAxisControlsUI();
+};
+
+const readLeadLagOffset = (input) => {
+  const raw = input.value.trim();
+  if (!raw) return 0;
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.trunc(parsed);
+};
+
+const applyLeadLagOffsets = () => {
+  if (!chart || !chartSource) return;
+  rebuildShiftedSeriesDatasets();
+  chart.data.datasets = buildVisibleDatasets();
+  chart.update();
+};
+
 const clearChart = () => {
   if (chart) {
     chart.destroy();
@@ -383,9 +563,14 @@ const clearChart = () => {
   fullMaxX = null;
   latestSeriesAMaxX = null;
   viewSpan = null;
+  axisDefaults = { y: { min: null, max: null }, y1: { min: null, max: null } };
+  axisOverrides = { y: { min: null, max: null }, y1: { min: null, max: null } };
+  axisInversions = { y: false, y1: false };
+  seriesLeadLagOffsets = { seriesA: 0, seriesB: 0 };
   resetZoomButton.disabled = true;
   setQuickTimeframeButtonsDisabled(true);
   resetTimelineWindow();
+  updateAxisControlsUI();
 };
 
 const resetSeriesSelectors = () => {
@@ -509,28 +694,27 @@ const buildChart = (rows, columns) => {
     ? latestDateInFile
     : nextSeriesAMaxX;
 
+  const datesByIndex = [...new Set(points.map((point) => point.x.getTime()))].map((time) => new Date(time));
+  const dateIndexLookup = new Map(datesByIndex.map((date, index) => [date.getTime(), index]));
+
   chartSource = {
-    seriesADataset: makeSeriesDataset({
-      label: seriesAKey,
-      seriesKey: seriesAKey,
-      axisId: 'y',
-      points: seriesAPoints.map((point) => ({ x: point.x, y: point.seriesA })),
-      color: SERIES_A_COLOR,
+    datesByIndex,
+    dateIndexLookup,
+    seriesA: {
+      key: seriesAKey,
       style: seriesAStyle,
-      order: 2
-    }),
-    seriesBDataset:
+      points: seriesAPoints.map((point) => ({ x: point.x, y: point.seriesA }))
+    },
+    seriesB:
       seriesBKey && points.some((point) => point.seriesB !== null)
-        ? makeSeriesDataset({
-            label: seriesBKey,
-            seriesKey: seriesBKey,
-            axisId: 'y1',
-            points: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB })),
-            color: SERIES_B_COLOR,
+        ? {
+            key: seriesBKey,
             style: seriesBStyle,
-            order: 3
-          })
+            points: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB }))
+          }
         : null,
+    seriesADataset: null,
+    seriesBDataset: null,
     eventDataset:
       eventKey && eventPoints.length
         ? {
@@ -572,6 +756,8 @@ const buildChart = (rows, columns) => {
           }
         : null
   };
+
+  rebuildShiftedSeriesDatasets();
 
   chart = new Chart(canvas, {
     type: 'line',
@@ -631,7 +817,7 @@ const buildChart = (rows, columns) => {
           }
         },
         y1: {
-          display: Boolean(seriesBKey && chartSource.seriesBDataset),
+          display: Boolean(seriesBKey && chartSource.seriesB),
           position: 'right',
           grid: { drawOnChartArea: false },
           title: { display: true, text: seriesBKey || '' },
@@ -708,6 +894,14 @@ const buildChart = (rows, columns) => {
   if (chart) {
     chart.clear();
     chart.update();
+
+    axisDefaults = {
+      y: { min: chart.scales.y.min, max: chart.scales.y.max },
+      y1: { min: chart.scales.y1?.min ?? null, max: chart.scales.y1?.max ?? null }
+    };
+    axisOverrides = { y: { min: null, max: null }, y1: { min: null, max: null } };
+    axisInversions = { y: false, y1: false };
+    updateAxisControlsUI();
   }
 
   resetZoomButton.disabled = false;
@@ -975,6 +1169,67 @@ quickTimeframeButtons.forEach((button) => {
   });
 });
 
+seriesAMaxInput.addEventListener('input', () => {
+  if (!chart) return;
+  setAxisOverride('y', 'max', readAxisInputValue(seriesAMaxInput));
+});
+
+seriesAMinInput.addEventListener('input', () => {
+  if (!chart) return;
+  setAxisOverride('y', 'min', readAxisInputValue(seriesAMinInput));
+});
+
+seriesBMaxInput.addEventListener('input', () => {
+  if (!chart || !chartSource?.seriesB) return;
+  setAxisOverride('y1', 'max', readAxisInputValue(seriesBMaxInput));
+});
+
+seriesBMinInput.addEventListener('input', () => {
+  if (!chart || !chartSource?.seriesB) return;
+  setAxisOverride('y1', 'min', readAxisInputValue(seriesBMinInput));
+});
+
+seriesAResetButton.addEventListener('click', () => {
+  if (!chart) return;
+  resetAxisOverride('y');
+});
+
+seriesBResetButton.addEventListener('click', () => {
+  if (!chart || !chartSource?.seriesB) return;
+  resetAxisOverride('y1');
+});
+
+seriesAInvertToggle.addEventListener('change', () => {
+  if (!chart) return;
+  axisInversions.y = seriesAInvertToggle.checked;
+  applyAxisOverrides();
+});
+
+seriesBInvertToggle.addEventListener('change', () => {
+  if (!chart || !chartSource?.seriesB) return;
+  axisInversions.y1 = seriesBInvertToggle.checked;
+  applyAxisOverrides();
+});
+
+seriesALeadLagInput.addEventListener('input', () => {
+  if (!chart) return;
+  seriesLeadLagOffsets.seriesA = readLeadLagOffset(seriesALeadLagInput);
+  applyLeadLagOffsets();
+});
+
+seriesBLeadLagInput.addEventListener('input', () => {
+  if (!chart || !chartSource?.seriesB) return;
+  seriesLeadLagOffsets.seriesB = readLeadLagOffset(seriesBLeadLagInput);
+  applyLeadLagOffsets();
+});
+
+seriesLeadLagResetButton.addEventListener('click', () => {
+  if (!chart) return;
+  seriesLeadLagOffsets = { seriesA: 0, seriesB: 0 };
+  applyLeadLagOffsets();
+  updateAxisControlsUI();
+});
+
 const setupTimelineInteractions = () => {
   let dragMode = null;
   let startX = 0;
@@ -1051,4 +1306,5 @@ const setupTimelineInteractions = () => {
 };
 
 resetSeriesSelectors();
+updateAxisControlsUI();
 setupTimelineInteractions();

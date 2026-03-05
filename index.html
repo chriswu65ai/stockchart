@@ -29,7 +29,7 @@
         <div class="control-item">
           <label for="sheet-select">Sheet</label>
           <select id="sheet-select" disabled>
-            <option value="">Choose a sheet</option>
+            <option value="">Choose sheet</option>
           </select>
         </div>
 
@@ -101,6 +101,53 @@
           <button class="quick-timeframe-btn" type="button" data-years="10" disabled>10yr</button>
           <button id="reset-zoom" class="quick-timeframe-btn" type="button" disabled>Reset Zoom</button>
         </div>
+
+      </section>
+
+      <section class="advanced-section">
+        <details class="advanced-panel" id="advanced-panel">
+          <summary class="advanced-summary">Advanced</summary>
+          <div class="advanced-grid">
+            <div class="axis-controls" id="series-a-axis-controls">
+              <h3>Series A (max/min)</h3>
+              <input id="series-a-max" type="number" step="any" inputmode="decimal" placeholder="Max value" />
+              <input id="series-a-min" type="number" step="any" inputmode="decimal" placeholder="Min value" />
+              <div class="axis-actions">
+                <button id="series-a-reset" type="button" class="axis-reset-btn">Reset</button>
+                <label class="invert-toggle" for="series-a-invert">
+                  <input id="series-a-invert" type="checkbox" />
+                  Invert
+                </label>
+              </div>
+            </div>
+
+            <div class="axis-controls" id="series-b-axis-controls">
+              <h3>Series B (max/min)</h3>
+              <input id="series-b-max" type="number" step="any" inputmode="decimal" placeholder="Max value" />
+              <input id="series-b-min" type="number" step="any" inputmode="decimal" placeholder="Min value" />
+              <div class="axis-actions">
+                <button id="series-b-reset" type="button" class="axis-reset-btn">Reset</button>
+                <label class="invert-toggle" for="series-b-invert">
+                  <input id="series-b-invert" type="checkbox" />
+                  Invert
+                </label>
+              </div>
+            </div>
+
+            <div class="axis-controls" id="series-leadlag-controls">
+              <h3>Series lead/lag</h3>
+              <div class="leadlag-row">
+                <span>Series A</span>
+                <input id="series-a-leadlag" type="number" step="1" inputmode="numeric" placeholder="Series A +/-" />
+              </div>
+              <div class="leadlag-row">
+                <span>Series B</span>
+                <input id="series-b-leadlag" type="number" step="1" inputmode="numeric" placeholder="Series B +/-" />
+              </div>
+              <button id="series-leadlag-reset" type="button" class="axis-reset-btn">Reset</button>
+            </div>
+          </div>
+        </details>
       </section>
 
       <section class="tips">
