@@ -283,7 +283,7 @@ body.is-timeline-dragging {
 .advanced-grid {
   margin-top: 0.75rem;
   display: grid;
-  grid-template-columns: repeat(2, 15%);
+  grid-template-columns: repeat(3, 15%);
   justify-content: start;
   gap: 0.85rem;
 }
