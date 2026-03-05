@@ -208,13 +208,14 @@ const wrapByPixelWidth = (text, chartInstance, maxWidthPx) => {
   return lines;
 };
 
-const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style }) => {
+const makeSeriesDataset = ({ label, seriesKey, axisId, points, color, style, order }) => {
   const common = {
     label,
     seriesKey,
     yAxisID: axisId,
     data: points,
-    borderColor: color
+    borderColor: color,
+    order
   };
 
   if (style === 'bar') {
@@ -455,8 +456,17 @@ const buildChart = (rows, columns) => {
   const eventPoints = points.filter((point) => point.event);
   const commentPoints = points.filter((point) => point.comment);
 
+  const latestDateInFile = rows.reduce((latest, row) => {
+    const rowDate = parseDate(row[dateKey]);
+    if (!rowDate) return latest;
+    const rowTime = rowDate.getTime();
+    return Math.max(latest, rowTime);
+  }, Number.NEGATIVE_INFINITY);
+
   const nextFullMinX = points[0].x.getTime();
-  const nextFullMaxX = points[points.length - 1].x.getTime();
+  const nextFullMaxX = Number.isFinite(latestDateInFile)
+    ? latestDateInFile
+    : points[points.length - 1].x.getTime();
 
   chartSource = {
     seriesADataset: makeSeriesDataset({
@@ -465,7 +475,8 @@ const buildChart = (rows, columns) => {
       axisId: 'y',
       points: points.map((point) => ({ x: point.x, y: point.seriesA })),
       color: SERIES_A_COLOR,
-      style: seriesAStyle
+      style: seriesAStyle,
+      order: 2
     }),
     seriesBDataset:
       seriesBKey && points.some((point) => point.seriesB !== null)
@@ -475,7 +486,8 @@ const buildChart = (rows, columns) => {
             axisId: 'y1',
             points: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB })),
             color: SERIES_B_COLOR,
-            style: seriesBStyle
+            style: seriesBStyle,
+            order: 3
           })
         : null,
     eventDataset:
@@ -494,7 +506,8 @@ const buildChart = (rows, columns) => {
             backgroundColor: '#f59e0b',
             borderColor: '#b45309',
             borderWidth: 1,
-            hoverBackgroundColor: '#f97316'
+            hoverBackgroundColor: '#f97316',
+            order: 1
           }
         : null,
     commentDataset:
@@ -513,7 +526,8 @@ const buildChart = (rows, columns) => {
             backgroundColor: '#22c55e',
             borderColor: '#15803d',
             borderWidth: 1,
-            hoverBackgroundColor: '#16a34a'
+            hoverBackgroundColor: '#16a34a',
+            order: 1
           }
         : null
   };
@@ -563,8 +577,8 @@ const buildChart = (rows, columns) => {
           type: 'time',
           time: { unit: 'month' },
           title: { display: true, text: dateKey },
-          min: preservedMinX,
-          max: preservedMaxX
+          min: nextFullMinX,
+          max: nextFullMaxX
         },
         y: {
           position: 'left',
