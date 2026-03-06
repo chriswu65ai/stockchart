@@ -47,6 +47,13 @@
           </select>
         </div>
 
+        <div class="control-item">
+          <label for="series-c-select">Series C (below)</label>
+          <select id="series-c-select" disabled>
+            <option value="">None</option>
+          </select>
+        </div>
+
         <div class="control-item checkbox-item toggle-stack">
           <label class="toggle-control" for="series-a-bar">
             <input id="series-a-bar" type="checkbox" />
@@ -56,12 +63,9 @@
             <input id="series-b-bar" type="checkbox" checked />
             Series B (bar)
           </label>
-        </div>
-
-        <div class="control-item checkbox-item toggle-stack">
-          <label class="toggle-control" for="disable-links">
-            <input id="disable-links" type="checkbox" checked />
-            Disable links
+          <label class="toggle-control" for="series-c-bar">
+            <input id="series-c-bar" type="checkbox" />
+            Series C (bar)
           </label>
         </div>
 
@@ -74,6 +78,10 @@
             <input id="show-comment-annotations" type="checkbox" checked />
             Show comments
           </label>
+          <label class="toggle-control" for="disable-links">
+            <input id="disable-links" type="checkbox" checked />
+            Disable links
+          </label>
         </div>
       </section>
 
@@ -84,6 +92,10 @@
       <section class="chart-panel">
         <div class="chart-container">
           <canvas id="share-chart" aria-label="Interactive share price chart"></canvas>
+        </div>
+
+        <div id="series-c-chart-container" class="chart-container chart-container-secondary is-hidden">
+          <canvas id="series-c-chart" aria-label="Interactive series C chart"></canvas>
         </div>
 
         <label class="scroll-label" for="timeline-window">Timeframe</label>
@@ -134,6 +146,19 @@
               </div>
             </div>
 
+            <div class="axis-controls" id="series-c-axis-controls">
+              <h3>Series C (max/min)</h3>
+              <input id="series-c-max" type="number" step="any" inputmode="decimal" placeholder="Max value" />
+              <input id="series-c-min" type="number" step="any" inputmode="decimal" placeholder="Min value" />
+              <div class="axis-actions">
+                <button id="series-c-reset" type="button" class="axis-reset-btn">Reset</button>
+                <label class="invert-toggle" for="series-c-invert">
+                  <input id="series-c-invert" type="checkbox" />
+                  Invert
+                </label>
+              </div>
+            </div>
+
             <div class="axis-controls" id="series-leadlag-controls">
               <h3>Series lead/lag</h3>
               <div class="leadlag-row">
@@ -143,6 +168,10 @@
               <div class="leadlag-row">
                 <span>Series B</span>
                 <input id="series-b-leadlag" type="number" step="1" inputmode="numeric" placeholder="Series B +/-" />
+              </div>
+              <div class="leadlag-row">
+                <span>Series C</span>
+                <input id="series-c-leadlag" type="number" step="1" inputmode="numeric" placeholder="Series C +/-" />
               </div>
               <button id="series-leadlag-reset" type="button" class="axis-reset-btn">Reset</button>
             </div>
