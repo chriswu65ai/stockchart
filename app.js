@@ -2,6 +2,7 @@ const fileInput = document.getElementById('excel-file');
 const sheetSelect = document.getElementById('sheet-select');
 const seriesASelect = document.getElementById('series-a-select');
 const seriesBSelect = document.getElementById('series-b-select');
+const seriesCSelect = document.getElementById('series-c-select');
 const seriesABarToggle = document.getElementById('series-a-bar');
 const seriesBBarToggle = document.getElementById('series-b-bar');
 const resetZoomButton = document.getElementById('reset-zoom');
@@ -10,6 +11,8 @@ const showCommentToggle = document.getElementById('show-comment-annotations');
 const disableLinksToggle = document.getElementById('disable-links');
 const statusText = document.getElementById('status');
 const canvas = document.getElementById('share-chart');
+const seriesCCanvas = document.getElementById('series-c-chart');
+const seriesCChartContainer = document.getElementById('series-c-chart-container');
 const timelineWindow = document.getElementById('timeline-window');
 const timelineSelection = document.getElementById('timeline-selection');
 const timelineHandleLeft = document.getElementById('timeline-handle-left');
@@ -32,6 +35,7 @@ const seriesLeadLagResetButton = document.getElementById('series-leadlag-reset')
 
 let workbook = null;
 let chart = null;
+let seriesCChart = null;
 let chartSource = null;
 let currentMeta = null;
 let currentSheetContext = null;
@@ -68,6 +72,7 @@ const URL_PATTERN = /(https?:\/\/[^\s]+)/i;
 const MIN_WINDOW_PCT = 2;
 const SERIES_A_COLOR = '#023047';
 const SERIES_B_COLOR = '#22C4DD';
+const SERIES_C_COLOR = '#7c3aed';
 
 const extractHyperlinkFromFormula = (formula) => {
   if (typeof formula !== 'string') return '';
@@ -414,6 +419,7 @@ const syncWindowFromChart = () => {
   isTimelineReady = true;
   timelineWindow.classList.remove('is-disabled');
   renderTimelineWindow();
+  syncSeriesCChartRangeFromMain();
 };
 
 const applyWindowToChart = () => {
@@ -428,6 +434,7 @@ const applyWindowToChart = () => {
   chart.options.scales.x.max = nextMax;
   chart.update('none');
   renderTimelineWindow();
+  syncSeriesCChartRangeFromMain();
 };
 
 const setQuickTimeframeButtonsDisabled = (disabled) => {
@@ -449,6 +456,7 @@ const applyLatestYearsWindow = (years) => {
   chart.options.scales.x.max = anchorMaxX;
   chart.update('none');
   syncWindowFromChart();
+  syncSeriesCChartRangeFromMain();
 };
 
 const getCurrentTimelineWindow = () => {
@@ -556,7 +564,12 @@ const clearChart = () => {
     chart.destroy();
     chart = null;
   }
+  if (seriesCChart) {
+    seriesCChart.destroy();
+    seriesCChart = null;
+  }
 
+  seriesCChartContainer.classList.add('is-hidden');
   chartSource = null;
   currentMeta = null;
   fullMinX = null;
@@ -576,10 +589,12 @@ const clearChart = () => {
 const resetSeriesSelectors = () => {
   seriesASelect.disabled = true;
   seriesBSelect.disabled = true;
+  seriesCSelect.disabled = true;
   seriesABarToggle.disabled = true;
   seriesBBarToggle.disabled = true;
   seriesASelect.innerHTML = '<option value="">Choose series A</option>';
   seriesBSelect.innerHTML = '<option value="">None</option>';
+  seriesCSelect.innerHTML = '<option value="">None</option>';
   seriesABarToggle.checked = false;
   seriesBBarToggle.checked = true;
 };
@@ -587,13 +602,18 @@ const resetSeriesSelectors = () => {
 const syncSeriesSelectorOptions = () => {
   const selectedA = seriesASelect.value;
   const selectedB = seriesBSelect.value;
+  const selectedC = seriesCSelect.value;
 
   Array.from(seriesASelect.options).forEach((option) => {
-    option.disabled = Boolean(option.value && option.value === selectedB);
+    option.disabled = Boolean(option.value && (option.value === selectedB || option.value === selectedC));
   });
 
   Array.from(seriesBSelect.options).forEach((option) => {
-    option.disabled = Boolean(option.value && option.value === selectedA);
+    option.disabled = Boolean(option.value && (option.value === selectedA || option.value === selectedC));
+  });
+
+  Array.from(seriesCSelect.options).forEach((option) => {
+    option.disabled = Boolean(option.value && (option.value === selectedA || option.value === selectedB));
   });
 };
 
@@ -610,6 +630,14 @@ const detectSeriesFormat = (worksheet, headers, seriesKey, rowCount) => {
   return '';
 };
 
+const syncSeriesCChartRangeFromMain = () => {
+  if (!chart || !seriesCChart) return;
+  seriesCChart.options.scales.x.min = chart.scales.x.min;
+  seriesCChart.options.scales.x.max = chart.scales.x.max;
+  seriesCChart.update('none');
+};
+
+
 const buildChart = (rows, columns) => {
   clearChart();
 
@@ -619,13 +647,14 @@ const buildChart = (rows, columns) => {
     commentKey,
     seriesAKey,
     seriesBKey,
+    seriesCKey,
     seriesAStyle,
     seriesBStyle,
     seriesFormats,
     worksheet,
     headers
   } = columns;
-  currentMeta = { seriesFormats, seriesAKey, seriesBKey };
+  currentMeta = { seriesFormats, seriesAKey, seriesBKey, seriesCKey };
 
   const eventColIndex = eventKey ? headers.indexOf(eventKey) : -1;
   const commentColIndex = commentKey ? headers.indexOf(commentKey) : -1;
@@ -635,12 +664,14 @@ const buildChart = (rows, columns) => {
       const date = parseDate(row[dateKey]);
       const seriesAValue = parseNumeric(row[seriesAKey]);
       const seriesBValue = seriesBKey ? parseNumeric(row[seriesBKey]) : NaN;
+      const seriesCValue = seriesCKey ? parseNumeric(row[seriesCKey]) : NaN;
 
       if (!date) return null;
 
       const normalizedSeriesA = Number.isNaN(seriesAValue) ? null : seriesAValue;
       const normalizedSeriesB = Number.isNaN(seriesBValue) ? null : seriesBValue;
-      if (normalizedSeriesA === null && normalizedSeriesB === null) return null;
+      const normalizedSeriesC = Number.isNaN(seriesCValue) ? null : seriesCValue;
+      if (normalizedSeriesA === null && normalizedSeriesB === null && normalizedSeriesC === null) return null;
 
       const event = eventKey && row[eventKey] ? String(row[eventKey]).trim() : '';
       const comment = commentKey && row[commentKey] ? String(row[commentKey]).trim() : '';
@@ -658,6 +689,7 @@ const buildChart = (rows, columns) => {
         x: date,
         seriesA: normalizedSeriesA,
         seriesB: normalizedSeriesB,
+        seriesC: normalizedSeriesC,
         event,
         comment,
         eventLink: eventCellLink || extractHttpUrl(event),
@@ -711,6 +743,13 @@ const buildChart = (rows, columns) => {
             key: seriesBKey,
             style: seriesBStyle,
             points: points.filter((point) => point.seriesB !== null).map((point) => ({ x: point.x, y: point.seriesB }))
+          }
+        : null,
+    seriesC:
+      seriesCKey && points.some((point) => point.seriesC !== null)
+        ? {
+            key: seriesCKey,
+            points: points.filter((point) => point.seriesC !== null).map((point) => ({ x: point.x, y: point.seriesC }))
           }
         : null,
     seriesADataset: null,
@@ -880,6 +919,69 @@ const buildChart = (rows, columns) => {
   preservedMaxX = nextFullMaxX;
   syncBubbleLinks(chart);
 
+  if (chartSource.seriesC) {
+    seriesCChartContainer.classList.remove('is-hidden');
+    seriesCChart = new Chart(seriesCCanvas, {
+      type: 'line',
+      data: {
+        datasets: [
+          {
+            type: 'line',
+            label: chartSource.seriesC.key,
+            data: chartSource.seriesC.points,
+            seriesKey: chartSource.seriesC.key,
+            yAxisID: 'y',
+            borderColor: SERIES_C_COLOR,
+            backgroundColor: `${SERIES_C_COLOR}33`,
+            fill: false,
+            tension: 0.2,
+            pointRadius: 2,
+            pointHoverRadius: 5
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: false },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'month' },
+            title: { display: true, text: dateKey },
+            min: nextFullMinX,
+            max: nextFullMaxX
+          },
+          y: {
+            position: 'left',
+            title: { display: true, text: chartSource.seriesC.key },
+            ticks: {
+              callback(value) {
+                return formatSeriesValue(chartSource.seriesC.key, value);
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                if (!items.length) return '';
+                return formatDateOnly(items[0].parsed.x);
+              },
+              label(context) {
+                return `${context.dataset.label}: ${formatSeriesValue(chartSource.seriesC.key, context.parsed.y)}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  } else {
+    seriesCChartContainer.classList.add('is-hidden');
+  }
+
   const preservedTimeline = columns.preserveTimeline;
   if (preservedTimeline && Number.isFinite(preservedTimeline.start) && Number.isFinite(preservedTimeline.size)) {
     windowSizePct = Math.max(MIN_WINDOW_PCT, Math.min(100, preservedTimeline.size));
@@ -924,7 +1026,7 @@ const populateSeriesSelectors = () => {
     return;
   }
 
-  seriesASelect.innerHTML = '';
+  seriesASelect.innerHTML = '<option value="">None</option>';
   options.forEach((key) => {
     const option = document.createElement('option');
     option.value = key;
@@ -933,21 +1035,28 @@ const populateSeriesSelectors = () => {
   });
 
   seriesBSelect.innerHTML = '<option value="">None</option>';
+  seriesCSelect.innerHTML = '<option value="">None</option>';
   options.forEach((key) => {
-    const option = document.createElement('option');
-    option.value = key;
-    option.textContent = key;
-    seriesBSelect.append(option);
+    const optionB = document.createElement('option');
+    optionB.value = key;
+    optionB.textContent = key;
+    seriesBSelect.append(optionB);
+
+    const optionC = document.createElement('option');
+    optionC.value = key;
+    optionC.textContent = key;
+    seriesCSelect.append(optionC);
   });
 
   seriesASelect.disabled = false;
   seriesBSelect.disabled = false;
+  seriesCSelect.disabled = false;
   seriesABarToggle.disabled = false;
   seriesBBarToggle.disabled = false;
 
-  seriesASelect.value = options[0];
-  const defaultB = options.find((key) => key !== options[0]);
-  seriesBSelect.value = defaultB || '';
+  seriesASelect.value = '';
+  seriesBSelect.value = '';
+  seriesCSelect.value = '';
   seriesABarToggle.checked = false;
   seriesBBarToggle.checked = true;
   syncSeriesSelectorOptions();
@@ -958,6 +1067,7 @@ const renderSelectedSeries = ({ preserveTimeline = true } = {}) => {
 
   const seriesAKey = seriesASelect.value;
   const seriesBKey = seriesBSelect.value;
+  const seriesCKey = seriesCSelect.value;
 
   if (!seriesAKey) {
     updateStatus('Please select Series A to render the chart.', true);
@@ -966,6 +1076,11 @@ const renderSelectedSeries = ({ preserveTimeline = true } = {}) => {
 
   if (seriesBKey && seriesBKey === seriesAKey) {
     updateStatus('Series A and Series B cannot be the same column.', true);
+    return;
+  }
+
+  if (seriesCKey && (seriesCKey === seriesAKey || seriesCKey === seriesBKey)) {
+    updateStatus('Series C must be different from Series A and Series B.', true);
     return;
   }
 
@@ -979,6 +1094,9 @@ const renderSelectedSeries = ({ preserveTimeline = true } = {}) => {
   if (seriesBKey) {
     seriesFormats[seriesBKey] = detectSeriesFormat(worksheet, headers, seriesBKey, rowCount);
   }
+  if (seriesCKey) {
+    seriesFormats[seriesCKey] = detectSeriesFormat(worksheet, headers, seriesCKey, rowCount);
+  }
 
   const preservedTimelineWindow = preserveTimeline ? getCurrentTimelineWindow() : null;
 
@@ -990,6 +1108,7 @@ const renderSelectedSeries = ({ preserveTimeline = true } = {}) => {
     headers,
     seriesAKey,
     seriesBKey: seriesBKey || null,
+    seriesCKey: seriesCKey || null,
     seriesAStyle: seriesABarToggle.checked ? 'bar' : 'line',
     seriesBStyle: seriesBBarToggle.checked ? 'bar' : 'line',
     seriesFormats,
@@ -1044,7 +1163,8 @@ const parseSheet = (sheetName) => {
     return;
   }
 
-  renderSelectedSeries({ preserveTimeline: false });
+  clearChart();
+  updateStatus('Sheet parsed. Select Series A/B/C to render chart(s).');
 };
 
 fileInput.addEventListener('change', async (event) => {
@@ -1110,11 +1230,23 @@ seriesASelect.addEventListener('change', () => {
   if (seriesBSelect.value && seriesBSelect.value === seriesASelect.value) {
     seriesBSelect.value = '';
   }
+  if (seriesCSelect.value && seriesCSelect.value === seriesASelect.value) {
+    seriesCSelect.value = '';
+  }
   syncSeriesSelectorOptions();
   renderSelectedSeries();
 });
 
 seriesBSelect.addEventListener('change', () => {
+  if (!currentSheetContext) return;
+  if (seriesCSelect.value && seriesCSelect.value === seriesBSelect.value) {
+    seriesCSelect.value = '';
+  }
+  syncSeriesSelectorOptions();
+  renderSelectedSeries();
+});
+
+seriesCSelect.addEventListener('change', () => {
   if (!currentSheetContext) return;
   syncSeriesSelectorOptions();
   renderSelectedSeries();
@@ -1157,6 +1289,7 @@ const triggerResetZoom = (event) => {
   chart.update();
 
   syncWindowFromChart();
+  syncSeriesCChartRangeFromMain();
 };
 
 resetZoomButton.addEventListener('click', triggerResetZoom);
