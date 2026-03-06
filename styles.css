@@ -63,7 +63,7 @@ header h1 {
 .controls {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr 1fr 0.9fr;
+  grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr 1fr 1fr 0.9fr;
   align-items: end;
 }
 
@@ -122,6 +122,15 @@ button:disabled {
   height: 450px;
   width: 100%;
   touch-action: none;
+}
+
+.chart-container-secondary {
+  margin-top: 0.75rem;
+  height: 250px;
+}
+
+.is-hidden {
+  display: none;
 }
 
 #share-chart {
@@ -283,7 +292,7 @@ body.is-timeline-dragging {
 .advanced-grid {
   margin-top: 0.75rem;
   display: grid;
-  grid-template-columns: repeat(3, 15%);
+  grid-template-columns: repeat(4, 15%);
   justify-content: start;
   gap: 0.85rem;
 }
@@ -294,6 +303,7 @@ body.is-timeline-dragging {
   padding: 0.75rem;
   display: grid;
   gap: 0.5rem;
+  min-height: 188px;
 }
 
 .axis-controls h3 {
@@ -351,4 +361,9 @@ body.is-timeline-dragging {
   width: 100%;
   max-width: 62px;
   justify-self: end;
+}
+
+
+#series-leadlag-controls .leadlag-row input {
+  max-width: 56px;
 }
