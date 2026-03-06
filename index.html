@@ -47,6 +47,13 @@
           </select>
         </div>
 
+        <div class="control-item">
+          <label for="series-c-select">Series C (below)</label>
+          <select id="series-c-select" disabled>
+            <option value="">None</option>
+          </select>
+        </div>
+
         <div class="control-item checkbox-item toggle-stack">
           <label class="toggle-control" for="series-a-bar">
             <input id="series-a-bar" type="checkbox" />
@@ -55,13 +62,6 @@
           <label class="toggle-control" for="series-b-bar">
             <input id="series-b-bar" type="checkbox" checked />
             Series B (bar)
-          </label>
-        </div>
-
-        <div class="control-item checkbox-item toggle-stack">
-          <label class="toggle-control" for="disable-links">
-            <input id="disable-links" type="checkbox" checked />
-            Disable links
           </label>
         </div>
 
@@ -74,6 +74,10 @@
             <input id="show-comment-annotations" type="checkbox" checked />
             Show comments
           </label>
+          <label class="toggle-control" for="disable-links">
+            <input id="disable-links" type="checkbox" checked />
+            Disable links
+          </label>
         </div>
       </section>
 
@@ -84,6 +88,10 @@
       <section class="chart-panel">
         <div class="chart-container">
           <canvas id="share-chart" aria-label="Interactive share price chart"></canvas>
+        </div>
+
+        <div id="series-c-chart-container" class="chart-container chart-container-secondary is-hidden">
+          <canvas id="series-c-chart" aria-label="Interactive series C chart"></canvas>
         </div>
 
         <label class="scroll-label" for="timeline-window">Timeframe</label>
